@@ -35,13 +35,13 @@ def make_abs_path(fn):
 class LivePortraitPipeline(object):
 
     def __init__(self, appearance_feature_extractor, motion_extractor, warping_module,
-                 spade_generator, stitching_retargeting_module, inference_cfg: InferenceConfig, crop_cfg: CropConfig):
+                 spade_generator, stitching_retargeting_module, inference_cfg: InferenceConfig):
 
         self.live_portrait_wrapper: LivePortraitWrapper = LivePortraitWrapper(
                 appearance_feature_extractor, motion_extractor, warping_module,
                 spade_generator, stitching_retargeting_module, cfg=inference_cfg)
 
-        self.cropper = Cropper(crop_cfg=crop_cfg)
+        #self.cropper = Cropper(crop_cfg=crop_cfg)
 
     def execute(self, img_rgb, driving_images_np, args: ArgumentConfig):
         inference_cfg = self.live_portrait_wrapper.cfg # for convenience

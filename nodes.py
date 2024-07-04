@@ -9,7 +9,7 @@ script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from .liveportrait.config.argument_config import ArgumentConfig
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
-
+from .liveportrait.utils.cropper import Cropper
 from .liveportrait.modules.spade_generator import SPADEDecoder
 from .liveportrait.modules.warping_network import WarpingNetwork
 from .liveportrait.modules.motion_extractor import MotionExtractor
@@ -131,7 +131,7 @@ class DownloadAndLoadLivePortraitModels:
         model_config_path = os.path.join(script_directory, 'liveportrait', 'config', 'models.yaml')
         with open(model_config_path, 'r') as file:
             model_config = yaml.safe_load(file)
-        print(model_config)
+        
         feature_extractor_path = os.path.join(model_path, 'appearance_feature_extractor.safetensors')
         motion_extractor_path = os.path.join(model_path, 'motion_extractor.safetensors')
         warping_module_path = os.path.join(model_path, 'warping_module.safetensors')
@@ -176,7 +176,6 @@ class DownloadAndLoadLivePortraitModels:
         config = model_config['model_params']['stitching_retargeting_module_params']
         checkpoint = comfy.utils.load_torch_file(stitching_retargeting_path)
 
-        # Example usage for the stitcher model
         stitcher_prefix = 'retarget_shoulder'
         stitcher_checkpoint = filter_checkpoint_for_model(checkpoint, stitcher_prefix)
         stitcher = StitchingRetargetingNetwork(**config.get('stitching'))
@@ -184,7 +183,6 @@ class DownloadAndLoadLivePortraitModels:
         stitcher = stitcher.to(device)
         stitcher.eval()
 
-        # Repeat for other models with their respective prefixes
         lip_prefix = 'retarget_mouth'
         lip_checkpoint = filter_checkpoint_for_model(checkpoint, lip_prefix)
         retargetor_lip = StitchingRetargetingNetwork(**config.get('lip'))
@@ -212,8 +210,7 @@ class DownloadAndLoadLivePortraitModels:
             self.warping_module,
             self.spade_generator,
             self.stich_retargeting_module,
-            InferenceConfig(),
-            CropConfig()
+            InferenceConfig()
         )
 
         return (pipeline,)
@@ -226,6 +223,10 @@ class LivePortraitProcess:
             "pipeline": ("LIVEPORTRAITPIPE",),
             "source_image": ("IMAGE",),
             "driving_images": ("IMAGE",),
+            "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
+            "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0}),
+            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0}),
+            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0}),
 
             },
         }
@@ -235,13 +236,25 @@ class LivePortraitProcess:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, driving_images, pipeline):
-        device = mm.get_torch_device()
-
+    def process(self, source_image, driving_images, dsize, scale, vx_ratio, vy_ratio, pipeline):
         source_image_np = (source_image.squeeze(0) * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
 
-        args =  ArgumentConfig()
+        crop_cfg = CropConfig(
+            dsize = dsize,
+            scale = scale,
+            vx_ratio = vx_ratio,
+            vy_ratio = vy_ratio
+            )
+        
+        cropper = Cropper(crop_cfg=crop_cfg)
+        pipeline.cropper = cropper
+        args =  ArgumentConfig(
+            dsize = dsize,
+            scale = scale,
+            vx_ratio = vx_ratio,
+            vy_ratio = vy_ratio
+        )
 
         cropped_frames, full_frame = pipeline.execute(source_image_np, driving_images_np, args)
 
@@ -252,9 +265,6 @@ class LivePortraitProcess:
         full_tensors = [torch.from_numpy(np_array) for np_array in full_frame]
         full_tensors_out = torch.stack(full_tensors) / 255
         full_tensors_out = full_tensors_out.cpu().float()
-
-        print(cropped_tensors_out.shape)
-        print(cropped_tensors_out.min(), cropped_tensors_out.max())
 
         return (cropped_tensors_out, full_tensors_out)
 
