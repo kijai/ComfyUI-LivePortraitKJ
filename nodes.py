@@ -225,8 +225,8 @@ class LivePortraitProcess:
             "driving_images": ("IMAGE",),
             "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
             "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0}),
-            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0}),
-            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0}),
+            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
+            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
 
             },
         }
