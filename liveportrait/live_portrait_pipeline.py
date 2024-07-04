@@ -4,30 +4,26 @@
 Pipeline of LivePortrait
 """
 
-# TODO:
-# 1. 当前假定所有的模板都是已经裁好的，需要修改下
-# 2. pick样例图 source + driving
-
 import cv2
 import numpy as np
-import pickle
 import os.path as osp
 from rich.progress import track
 
-from .config.argument_config import ArgumentConfig
 from .config.inference_config import InferenceConfig
-from .config.crop_config import CropConfig
-from .utils.cropper import Cropper
+
+#from .utils.cropper import Cropper
 from .utils.camera import get_rotation_matrix
-from .utils.video import images2video, concat_frames
+#from .utils.video import images2video, concat_frames
 from .utils.crop import _transform_img
-from .utils.retargeting_utils import calc_lip_close_ratio
-from .utils.io import load_image_rgb, load_driving_info
-from .utils.helper import mkdir, basename, dct2cuda, is_video, is_template, resize_to_limit
-from .utils.rprint import rlog as log
+#from .utils.retargeting_utils import calc_lip_close_ratio
+#from .utils.io import load_image_rgb, load_driving_info
+#from .utils.helper import mkdir, basename, dct2cuda, is_video, is_template, resize_to_limit
+from .utils.helper import resize_to_limit
+#from .utils.rprint import rlog as log
 from .live_portrait_wrapper import LivePortraitWrapper
 
 import comfy.utils
+
 def make_abs_path(fn):
     return osp.join(osp.dirname(osp.realpath(__file__)), fn)
 
@@ -41,9 +37,7 @@ class LivePortraitPipeline(object):
                 appearance_feature_extractor, motion_extractor, warping_module,
                 spade_generator, stitching_retargeting_module, cfg=inference_cfg)
 
-        #self.cropper = Cropper(crop_cfg=crop_cfg)
-
-    def execute(self, img_rgb, driving_images_np, args: ArgumentConfig):
+    def execute(self, img_rgb, driving_images_np):
         inference_cfg = self.live_portrait_wrapper.cfg # for convenience
         ######## process reference portrait ########
         #img_rgb = load_image_rgb(args.source_image)
@@ -86,6 +80,7 @@ class LivePortraitPipeline(object):
         if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
             driving_lmk_lst = self.cropper.get_retargeting_lmk_info(driving_rgb_lst)
             input_eye_ratio_lst, input_lip_ratio_lst = self.live_portrait_wrapper.calc_retargeting_ratio(source_lmk, driving_lmk_lst)
+
         # elif is_template(args.driving_info):
         #     log(f"Load from video templates {args.driving_info}")
         #     with open(args.driving_info, 'rb') as f:
@@ -187,21 +182,4 @@ class LivePortraitPipeline(object):
             out = np.hstack([I_p_i_to_ori, I_p_i_to_ori_blend])
             I_p_paste_lst.append(I_p_i_to_ori_blend)
 
-        #mkdir(args.output_dir)
-        wfp_concat = None
-        #if is_video(args.driving_info):
-
-        #frames_concatenated = concat_frames(I_p_lst, driving_rgb_lst, img_crop_256x256)
         return I_p_lst, I_p_paste_lst
-        # # save (driving frames, source image, drived frames) result
-        # wfp_concat = osp.join(args.output_dir, f'{basename(args.source_image)}--{basename(args.driving_info)}_concat.mp4')
-        # images2video(frames_concatenated, wfp=wfp_concat)
-
-        # # save drived result
-        # wfp = osp.join(args.output_dir, f'{basename(args.source_image)}--{basename(args.driving_info)}.mp4')
-        # if inference_cfg.flag_pasteback:
-        #     images2video(I_p_paste_lst, wfp=wfp)
-        # else:
-        #     images2video(I_p_lst, wfp=wfp)
-
-        # return wfp, wfp_concat

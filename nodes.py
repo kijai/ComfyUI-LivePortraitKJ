@@ -28,13 +28,8 @@ class InferenceConfig:
                     flag_relative=True,
                     anchor_frame=0,
                     input_shape=(256, 256),
-                    output_format='mp4',
-                    output_fps=30,
-                    crf=15,
                     flag_write_result=True,
                     flag_pasteback=True,
-                    flag_write_gif=False,
-                    size_gif=256,
                     ref_max_shape=1280,
                     ref_shape_n=2,
                     device_id=0,
@@ -49,13 +44,8 @@ class InferenceConfig:
         self.flag_relative = flag_relative
         self.anchor_frame = anchor_frame
         self.input_shape = input_shape
-        self.output_format = output_format
-        self.output_fps = output_fps
-        self.crf = crf
         self.flag_write_result = flag_write_result
         self.flag_pasteback = flag_pasteback
-        self.flag_write_gif = flag_write_gif
-        self.size_gif = size_gif
         self.ref_max_shape = ref_max_shape
         self.ref_shape_n = ref_shape_n
         self.device_id = device_id
@@ -227,7 +217,11 @@ class LivePortraitProcess:
             "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0}),
             "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
             "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
-
+            "lip_zero": ("BOOLEAN", {"default": True}),
+            "eye_retargeting": ("BOOLEAN", {"default": False}),
+            "lip_retargeting": ("BOOLEAN", {"default": False}),
+            "stitching": ("BOOLEAN", {"default": True}),
+            "relative": ("BOOLEAN", {"default": True}),
             },
         }
 
@@ -236,35 +230,43 @@ class LivePortraitProcess:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, driving_images, dsize, scale, vx_ratio, vy_ratio, pipeline):
-        source_image_np = (source_image.squeeze(0) * 255).byte().numpy()
+    def process(self, source_image, driving_images, dsize, scale, vx_ratio, vy_ratio, pipeline, 
+                lip_zero, eye_retargeting, lip_retargeting, stitching, relative):
+        source_image_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
 
         crop_cfg = CropConfig(
             dsize = dsize,
             scale = scale,
             vx_ratio = vx_ratio,
-            vy_ratio = vy_ratio
+            vy_ratio = vy_ratio,
             )
         
         cropper = Cropper(crop_cfg=crop_cfg)
         pipeline.cropper = cropper
-        args =  ArgumentConfig(
-            dsize = dsize,
-            scale = scale,
-            vx_ratio = vx_ratio,
-            vy_ratio = vy_ratio
-        )
+        pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = eye_retargeting
+        pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = lip_retargeting
+        pipeline.live_portrait_wrapper.cfg.flag_stitching = stitching
+        pipeline.live_portrait_wrapper.cfg.flag_relative = relative
+        pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
+      
+        cropped_out_list = []
+        full_out_list = []
+        for img in source_image_np:
+            cropped_frames, full_frame = pipeline.execute(img, driving_images_np)
+            cropped_tensors = [torch.from_numpy(np_array) for np_array in cropped_frames]
+            cropped_tensors_out = torch.stack(cropped_tensors) / 255
+            cropped_tensors_out = cropped_tensors_out.cpu().float()
 
-        cropped_frames, full_frame = pipeline.execute(source_image_np, driving_images_np, args)
+            full_tensors = [torch.from_numpy(np_array) for np_array in full_frame]
+            full_tensors_out = torch.stack(full_tensors) / 255
+            full_tensors_out = full_tensors_out.cpu().float()
 
-        cropped_tensors = [torch.from_numpy(np_array) for np_array in cropped_frames]
-        cropped_tensors_out = torch.stack(cropped_tensors) / 255
-        cropped_tensors_out = cropped_tensors_out.cpu().float()
+            cropped_out_list.append(cropped_tensors_out)
+            full_out_list.append(full_tensors_out)
 
-        full_tensors = [torch.from_numpy(np_array) for np_array in full_frame]
-        full_tensors_out = torch.stack(full_tensors) / 255
-        full_tensors_out = full_tensors_out.cpu().float()
+        cropped_tensors_out = torch.cat(cropped_out_list, dim=0)
+        full_tensors_out = torch.cat(full_out_list, dim=0)
 
         return (cropped_tensors_out, full_tensors_out)
 
