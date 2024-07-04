@@ -4,13 +4,12 @@
 https://github.com/kijai/ComfyUI-LivePortrait/assets/40791699/e55e10f6-af61-4d73-b162-af29eb847516
 
 
-I have converted all the pickle files to safetensors, and they
+I have converted all the pickle files to safetensors: https://huggingface.co/Kijai/LivePortrait_safetensors/tree/main
 
-are automatically downloaded from here to `ComfyUI/models/liveportrait`:
+They go here (and are automatically downloaded if the folder is not present) `ComfyUI/models/liveportrait`
 
-https://huggingface.co/Kijai/LivePortrait_safetensors/tree/main
 
-Insightface is required.
+Insightface is also required.
 If you have a working compile encironment, installing it can be as easy as:
 
 `pip install insightface`
