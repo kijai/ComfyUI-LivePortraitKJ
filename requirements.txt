@@ -1,4 +1,4 @@
-yaml
+pyyaml
 numpy
 opencv-python
 rich
