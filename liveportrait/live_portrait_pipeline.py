@@ -151,11 +151,13 @@ class LivePortraitPipeline(object):
                 if inference_cfg.flag_eye_retargeting:
                     c_d_eyes_i = input_eye_ratio_lst[i]
                     combined_eye_ratio_tensor = self.live_portrait_wrapper.calc_combined_eye_ratio(c_d_eyes_i, source_lmk)
+                    combined_eye_ratio_tensor = combined_eye_ratio_tensor * inference_cfg.eyes_retargeting_multiplier
                     # ∆_eyes,i = R_eyes(x_s; c_s,eyes, c_d,eyes,i)
                     eyes_delta = self.live_portrait_wrapper.retarget_eye(x_s, combined_eye_ratio_tensor)
                 if inference_cfg.flag_lip_retargeting:
                     c_d_lip_i = input_lip_ratio_lst[i]
                     combined_lip_ratio_tensor = self.live_portrait_wrapper.calc_combined_lip_ratio(c_d_lip_i, source_lmk)
+                    combined_lip_ratio_tensor = combined_lip_ratio_tensor * inference_cfg.lip_retargeting_multiplier
                     # ∆_lip,i = R_lip(x_s; c_s,lip, c_d,lip,i)
                     lip_delta = self.live_portrait_wrapper.retarget_lip(x_s, combined_lip_ratio_tensor)
 

@@ -219,7 +219,9 @@ class LivePortraitProcess:
             "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
             "lip_zero": ("BOOLEAN", {"default": True}),
             "eye_retargeting": ("BOOLEAN", {"default": False}),
+            "eyes_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.01}),
             "lip_retargeting": ("BOOLEAN", {"default": False}),
+            "lip_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.01}),
             "stitching": ("BOOLEAN", {"default": True}),
             "relative": ("BOOLEAN", {"default": True}),
             },
@@ -231,7 +233,7 @@ class LivePortraitProcess:
     CATEGORY = "LivePortrait"
 
     def process(self, source_image, driving_images, dsize, scale, vx_ratio, vy_ratio, pipeline, 
-                lip_zero, eye_retargeting, lip_retargeting, stitching, relative):
+                lip_zero, eye_retargeting, lip_retargeting, stitching, relative, eyes_retargeting_multiplier, lip_retargeting_multiplier):
         source_image_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
 
@@ -245,7 +247,9 @@ class LivePortraitProcess:
         cropper = Cropper(crop_cfg=crop_cfg)
         pipeline.cropper = cropper
         pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = eye_retargeting
+        pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = eyes_retargeting_multiplier
         pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = lip_retargeting
+        pipeline.live_portrait_wrapper.cfg.lip_retargeting_multiplier = lip_retargeting_multiplier
         pipeline.live_portrait_wrapper.cfg.flag_stitching = stitching
         pipeline.live_portrait_wrapper.cfg.flag_relative = relative
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
