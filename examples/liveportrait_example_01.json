@@ -3,71 +3,6 @@
   "last_link_id": 68,
   "nodes": [
     {
-      "id": 30,
-      "type": "LivePortraitProcess",
-      "pos": [
-        491,
-        315
-      ],
-      "size": {
-        "0": 367.79998779296875,
-        "1": 290
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "pipeline",
-          "type": "LIVEPORTRAITPIPE",
-          "link": 58
-        },
-        {
-          "name": "source_image",
-          "type": "IMAGE",
-          "link": 59
-        },
-        {
-          "name": "driving_images",
-          "type": "IMAGE",
-          "link": 60
-        }
-      ],
-      "outputs": [
-        {
-          "name": "cropped_images",
-          "type": "IMAGE",
-          "links": [],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "full_images",
-          "type": "IMAGE",
-          "links": [
-            67,
-            68
-          ],
-          "shape": 3,
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitProcess"
-      },
-      "widgets_values": [
-        512,
-        2.3,
-        0,
-        -0.125,
-        true,
-        false,
-        false,
-        true,
-        true
-      ]
-    },
-    {
       "id": 1,
       "type": "DownloadAndLoadLivePortraitModels",
       "pos": [
@@ -341,11 +276,11 @@
       "id": 23,
       "type": "VHS_VideoCombine",
       "pos": [
-        1125,
-        297
+        1098,
+        240
       ],
       "size": [
-        1253.2340964355458,
+        1253.234130859375,
         920.6170654296875
       ],
       "flags": {},
@@ -393,13 +328,80 @@
           "hidden": false,
           "paused": false,
           "params": {
-            "filename": "LivePortrait_00001.mp4",
+            "filename": "LivePortrait_00005.mp4",
             "subfolder": "",
             "type": "temp",
             "format": "video/h264-mp4"
           }
         }
       }
+    },
+    {
+      "id": 30,
+      "type": "LivePortraitProcess",
+      "pos": [
+        500,
+        249
+      ],
+      "size": {
+        "0": 367.79998779296875,
+        "1": 338
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pipeline",
+          "type": "LIVEPORTRAITPIPE",
+          "link": 58
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 59
+        },
+        {
+          "name": "driving_images",
+          "type": "IMAGE",
+          "link": 60
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cropped_images",
+          "type": "IMAGE",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "full_images",
+          "type": "IMAGE",
+          "links": [
+            67,
+            68
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitProcess"
+      },
+      "widgets_values": [
+        512,
+        2.3,
+        0,
+        -0.125,
+        true,
+        false,
+        1,
+        false,
+        1,
+        true,
+        true
+      ]
     }
   ],
   "links": [
@@ -472,10 +474,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.826446280991736,
+      "scale": 0.8264462809917354,
       "offset": {
-        "0": 241.89988708496094,
-        "1": -37.31983184814453
+        "0": 128.11993408203125,
+        "1": 16.40328598022461
       }
     }
   },
