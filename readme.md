@@ -1,4 +1,4 @@
-# ComfyUI nodes to use LivePortrait
+# ComfyUI nodes to use [LivePortrait](https://github.com/KwaiVGI/LivePortrait)
 
 
 https://github.com/kijai/ComfyUI-LivePortrait/assets/40791699/e55e10f6-af61-4d73-b162-af29eb847516
