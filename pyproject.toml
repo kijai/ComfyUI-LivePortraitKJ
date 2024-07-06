@@ -10,6 +10,6 @@ Repository = "https://github.com/kijai/ComfyUI-LivePortraitKJ"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "kijai"
 DisplayName = "ComfyUI-LivePortraitKJ"
 Icon = ""
