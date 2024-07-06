@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-liveportraitkj"
+description = "Nodes for [a/LivePortrait](https://github.com/KwaiVGI/LivePortrait), insightface is required"
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["pyyaml", "numpy", "opencv-python", "rich"]
+
+[project.urls]
+Repository = "https://github.com/kijai/ComfyUI-LivePortraitKJ"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-LivePortraitKJ"
+Icon = ""
