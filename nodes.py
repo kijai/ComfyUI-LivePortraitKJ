@@ -200,7 +200,7 @@ class DownloadAndLoadLivePortraitModels:
             self.warping_module,
             self.spade_generator,
             self.stich_retargeting_module,
-            InferenceConfig()
+            InferenceConfig(device_id=device)
         )
 
         return (pipeline,)

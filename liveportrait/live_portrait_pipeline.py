@@ -45,7 +45,7 @@ class LivePortraitPipeline(object):
         #log(f"Load source image from {args.source_image}")
         crop_info = self.cropper.crop_single_image(img_rgb)
         source_lmk = crop_info['lmk_crop']
-        img_crop, img_crop_256x256 = crop_info['img_crop'], crop_info['img_crop_256x256']
+        _, img_crop_256x256 = crop_info['img_crop'], crop_info['img_crop_256x256']
         if inference_cfg.flag_do_crop:
             I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
         else:
