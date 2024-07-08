@@ -10,7 +10,7 @@ They go here (and are automatically downloaded if the folder is not present) `Co
 
 
 Insightface is also required.
-If you have a working compile encironment, installing it can be as easy as:
+If you have a working compile environment, installing it can be as easy as:
 
 `pip install insightface`
 
