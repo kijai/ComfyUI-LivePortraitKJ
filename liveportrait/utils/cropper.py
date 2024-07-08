@@ -101,7 +101,7 @@ class Cropper(object):
         ret_dct['lmk_crop'] = lmk
 
         # Draw each landmark as a circle
-        width, height = 512, 512
+        height, width = img_rgb.shape[:2]
         blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
         for (x, y) in lmk:
             # Ensure the coordinates are within the dimensions of the blank image

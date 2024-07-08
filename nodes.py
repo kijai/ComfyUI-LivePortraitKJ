@@ -272,6 +272,9 @@ class LivePortraitProcess:
             "stitching": ("BOOLEAN", {"default": True}),
             "relative": ("BOOLEAN", {"default": True}),
             },
+            "optional": {
+                "mask": ("MASK", {"default": None}),
+            }
         }
 
     RETURN_TYPES = (
@@ -299,6 +302,7 @@ class LivePortraitProcess:
         eyes_retargeting_multiplier: float,
         lip_retargeting_multiplier: float,
         mismatch_method: str = "repeat",
+        mask: torch.Tensor = None,
     ):
         source_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
@@ -314,6 +318,12 @@ class LivePortraitProcess:
         pipeline.live_portrait_wrapper.cfg.flag_stitching = stitching
         pipeline.live_portrait_wrapper.cfg.flag_relative = relative
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
+
+        if mask is not None:
+            crop_mask = mask[0].cpu().numpy()
+            crop_mask = (crop_mask * 255).astype(np.uint8)
+            crop_mask = np.repeat(np.atleast_3d(crop_mask), 3, axis=2)
+            pipeline.live_portrait_wrapper.cfg.mask_crop = crop_mask
 
         pipeline.cropper = crop_info['cropper']
 
