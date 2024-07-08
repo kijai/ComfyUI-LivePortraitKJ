@@ -69,7 +69,9 @@ class LivePortraitPipeline(object):
                 min(int(ratio * (source_np.shape[0] - 1)), source_np.shape[0] - 1)
             ]
 
-    def execute(self, source_np, driving_images_np, mismatch_method="repeat"):
+    def execute(
+        self, source_np, driving_images_np, mismatch_method="repeat", reference_frame=0
+    ):
         inference_cfg = self.live_portrait_wrapper.cfg
         is_video = source_np.shape[0] > 1
 
@@ -79,6 +81,16 @@ class LivePortraitPipeline(object):
         total_frames = driving_images_np.shape[0]
 
         pbar = comfy.utils.ProgressBar(total_frames)
+
+        ref_frame = self._get_source_frame(
+            source_np, reference_frame, total_frames, mismatch_method
+        )
+        rcrop_info = self.cropper.crop_single_image(ref_frame)
+        rsource_lmk = rcrop_info["lmk_crop"]
+        rimg_crop, ref_crop_256x256 = (
+            rcrop_info["img_crop"],
+            rcrop_info["img_crop_256x256"],
+        )
 
         for i in range(total_frames):
             source_frame_rgb = self._get_source_frame(
@@ -98,6 +110,9 @@ class LivePortraitPipeline(object):
             else:
                 I_s = self.live_portrait_wrapper.prepare_source(source_frame_rgb)
 
+            rel_s_info = self.live_portrait_wrapper.get_kp_info(
+                self.live_portrait_wrapper.prepare_source(ref_crop_256x256)
+            )
             x_s_info = self.live_portrait_wrapper.get_kp_info(I_s)
             x_c_s = x_s_info["kp"]
             R_s = get_rotation_matrix(
@@ -147,9 +162,11 @@ class LivePortraitPipeline(object):
 
             if inference_cfg.flag_relative:
                 R_new = R_d @ R_s
-                delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_s_info["exp"])
-                scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_s_info["scale"])
-                t_new = x_s_info["t"] + (x_d_info["t"] - x_s_info["t"])
+                delta_new = rel_s_info["exp"] + (x_d_info["exp"] - rel_s_info["exp"])
+                scale_new = rel_s_info["scale"] * (
+                    x_d_info["scale"] / rel_s_info["scale"]
+                )
+                t_new = rel_s_info["t"] + (x_d_info["t"] - rel_s_info["t"])
             else:
                 R_new = R_d
                 delta_new = x_d_info["exp"]
