@@ -82,6 +82,7 @@ class Cropper(object):
 
         src_face = src_face[0]
         pts = src_face.landmark_2d_106
+       
 
         # crop the face
         ret_dct = crop_image(
@@ -99,7 +100,17 @@ class Cropper(object):
         lmk = recon_ret['pts']
         ret_dct['lmk_crop'] = lmk
 
-        return ret_dct
+        # Draw each landmark as a circle
+        width, height = 512, 512
+        blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
+        for (x, y) in lmk:
+            # Ensure the coordinates are within the dimensions of the blank image
+            if 0 <= x < width and 0 <= y < height:
+                cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
+
+        keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
+
+        return ret_dct, keypoints_image
 
     def get_retargeting_lmk_info(self, driving_rgb_lst):
         # TODO: implement a tracking-based version

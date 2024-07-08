@@ -37,15 +37,16 @@ class LivePortraitPipeline(object):
                 appearance_feature_extractor, motion_extractor, warping_module,
                 spade_generator, stitching_retargeting_module, cfg=inference_cfg)
 
-    def execute(self, img_rgb, driving_images_np):
+    def execute(self, img_rgb, driving_images_np, crop_info):
         inference_cfg = self.live_portrait_wrapper.cfg # for convenience
         ######## process reference portrait ########
         #img_rgb = load_image_rgb(args.source_image)
-        img_rgb = resize_to_limit(img_rgb, inference_cfg.ref_max_shape, inference_cfg.ref_shape_n)
+        #img_rgb = resize_to_limit(img_rgb, inference_cfg.ref_max_shape, inference_cfg.ref_shape_n)
         #log(f"Load source image from {args.source_image}")
-        crop_info = self.cropper.crop_single_image(img_rgb)
+        #crop_info = self.cropper.crop_single_image(img_rgb)
         source_lmk = crop_info['lmk_crop']
-        _, img_crop_256x256 = crop_info['img_crop'], crop_info['img_crop_256x256']
+        #_, img_crop_256x256 = crop_info['img_crop'], crop_info['img_crop_256x256']
+        img_crop_256x256 = img_rgb
         if inference_cfg.flag_do_crop:
             I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
         else:
@@ -59,7 +60,7 @@ class LivePortraitPipeline(object):
         if inference_cfg.flag_lip_zero:
             # let lip-open scalar to be 0 at first
             c_d_lip_before_animation = [0.]
-            combined_lip_ratio_tensor_before_animation = self.live_portrait_wrapper.calc_combined_lip_ratio(c_d_lip_before_animation, source_lmk)
+            combined_lip_ratio_tensor_before_animation = self.live_portrait_wrapper.calc_combined_lip_ratio(c_d_lip_before_animation, source_lmk, inference_cfg)
             if combined_lip_ratio_tensor_before_animation[0][0] < inference_cfg.lip_zero_threshold:
                 inference_cfg.flag_lip_zero = False
             else:
@@ -79,7 +80,7 @@ class LivePortraitPipeline(object):
         n_frames = I_d_lst.shape[0]
         if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
             driving_lmk_lst = self.cropper.get_retargeting_lmk_info(driving_rgb_lst)
-            input_eye_ratio_lst, input_lip_ratio_lst = self.live_portrait_wrapper.calc_retargeting_ratio(source_lmk, driving_lmk_lst)
+            input_eye_ratio_lst, input_lip_ratio_lst = self.live_portrait_wrapper.calc_retargeting_ratio(source_lmk, driving_lmk_lst, inference_cfg)
 
         # elif is_template(args.driving_info):
         #     log(f"Load from video templates {args.driving_info}")
@@ -150,14 +151,14 @@ class LivePortraitPipeline(object):
                 eyes_delta, lip_delta = None, None
                 if inference_cfg.flag_eye_retargeting:
                     c_d_eyes_i = input_eye_ratio_lst[i]
-                    combined_eye_ratio_tensor = self.live_portrait_wrapper.calc_combined_eye_ratio(c_d_eyes_i, source_lmk)
-                    combined_eye_ratio_tensor = combined_eye_ratio_tensor * inference_cfg.eyes_retargeting_multiplier
+                    combined_eye_ratio_tensor = self.live_portrait_wrapper.calc_combined_eye_ratio(c_d_eyes_i, source_lmk, inference_cfg)
+                    combined_eye_ratio_tensor = combined_eye_ratio_tensor
                     # ∆_eyes,i = R_eyes(x_s; c_s,eyes, c_d,eyes,i)
                     eyes_delta = self.live_portrait_wrapper.retarget_eye(x_s, combined_eye_ratio_tensor)
                 if inference_cfg.flag_lip_retargeting:
                     c_d_lip_i = input_lip_ratio_lst[i]
-                    combined_lip_ratio_tensor = self.live_portrait_wrapper.calc_combined_lip_ratio(c_d_lip_i, source_lmk)
-                    combined_lip_ratio_tensor = combined_lip_ratio_tensor * inference_cfg.lip_retargeting_multiplier
+                    combined_lip_ratio_tensor = self.live_portrait_wrapper.calc_combined_lip_ratio(c_d_lip_i, source_lmk, inference_cfg)
+                    combined_lip_ratio_tensor = combined_lip_ratio_tensor
                     # ∆_lip,i = R_lip(x_s; c_s,lip, c_d,lip,i)
                     lip_delta = self.live_portrait_wrapper.retarget_lip(x_s, combined_lip_ratio_tensor)
 

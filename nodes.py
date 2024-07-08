@@ -4,6 +4,8 @@ import yaml
 import folder_paths
 import comfy.model_management as mm
 import comfy.utils
+import numpy as np
+import cv2
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -223,12 +225,9 @@ class LivePortraitProcess:
         return {"required": {
 
             "pipeline": ("LIVEPORTRAITPIPE",),
+            "crop_info": ("CROPINFO", {"default": {}}),
             "source_image": ("IMAGE",),
             "driving_images": ("IMAGE",),
-            "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
-            "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01}),
-            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
-            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
             "lip_zero": ("BOOLEAN", {"default": True}),
             "eye_retargeting": ("BOOLEAN", {"default": False}),
             "eyes_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
@@ -237,17 +236,6 @@ class LivePortraitProcess:
             "stitching": ("BOOLEAN", {"default": True}),
             "relative": ("BOOLEAN", {"default": True}),
             },
-            "optional": {
-               "onnx_device": (
-                    [
-                        'CPU',
-                        'CUDA',                        
-                    ], {
-                        "default": 'CPU'
-                    }),
-            }
-
-
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE",)
@@ -255,20 +243,11 @@ class LivePortraitProcess:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, driving_images, dsize, scale, vx_ratio, vy_ratio, pipeline, 
-                lip_zero, eye_retargeting, lip_retargeting, stitching, relative, eyes_retargeting_multiplier, lip_retargeting_multiplier, onnx_device='CUDA'):
+    def process(self, source_image, driving_images, pipeline, 
+                lip_zero, eye_retargeting, lip_retargeting, stitching, relative, eyes_retargeting_multiplier, lip_retargeting_multiplier, crop_info = {}):
         source_image_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
-
-        crop_cfg = CropConfig(
-            dsize = dsize,
-            scale = scale,
-            vx_ratio = vx_ratio,
-            vy_ratio = vy_ratio,
-            )
         
-        cropper = Cropper(crop_cfg=crop_cfg, provider=onnx_device)
-        pipeline.cropper = cropper
         pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = eye_retargeting
         pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = eyes_retargeting_multiplier
         pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = lip_retargeting
@@ -280,7 +259,7 @@ class LivePortraitProcess:
         cropped_out_list = []
         full_out_list = []
         for img in source_image_np:
-            cropped_frames, full_frame = pipeline.execute(img, driving_images_np)
+            cropped_frames, full_frame = pipeline.execute(img, driving_images_np, crop_info)
             cropped_tensors = [torch.from_numpy(np_array) for np_array in cropped_frames]
             cropped_tensors_out = torch.stack(cropped_tensors) / 255
             cropped_tensors_out = cropped_tensors_out.cpu().float()
@@ -297,11 +276,119 @@ class LivePortraitProcess:
 
         return (cropped_tensors_out, full_tensors_out)
 
+class LivePortraitCropper:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+
+            "source_image": ("IMAGE",),
+            "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
+            "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01}),
+            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
+            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
+            },
+            "optional": {
+               "onnx_device": (
+                    [
+                        'CPU',
+                        'CUDA',
+                    ], {
+                        "default": 'CPU'
+                    }),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "CROPINFO", "IMAGE",)
+    RETURN_NAMES = ("cropped_image", "crop_info", "keypoints_image",)
+    FUNCTION = "process"
+    CATEGORY = "LivePortrait"
+
+    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, onnx_device='CUDA'):
+        source_image_np = (source_image * 255).byte().numpy()
+
+        crop_cfg = CropConfig(
+            dsize = dsize,
+            scale = scale,
+            vx_ratio = vx_ratio,
+            vy_ratio = vy_ratio,
+            )
+        
+        cropper = Cropper(crop_cfg=crop_cfg, provider=onnx_device)
+        crop_info, keypoints_img = cropper.crop_single_image(source_image_np[0])
+
+        keypoints_image_tensor = torch.from_numpy(keypoints_img) / 255
+        keypoints_image_tensor = keypoints_image_tensor.unsqueeze(0).cpu().float()
+        print(keypoints_image_tensor.shape)
+        
+
+        cropped_image = crop_info['img_crop_256x256']
+        cropped_tensors = torch.from_numpy(cropped_image) / 255
+        cropped_tensors = cropped_tensors.unsqueeze(0).cpu().float()
+        
+        print(cropped_tensors.shape)
+
+        return (cropped_tensors, crop_info, keypoints_image_tensor)
+
+class KeypointScaler:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+                "crop_info": ("CROPINFO", {"default": {}}),
+                "scale": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
+                "offset_x": ("INT", {"default": 0, "min": -1024, "max": 1024, "step": 1}),
+                "offset_y": ("INT", {"default": 0, "min": -1024, "max": 1024, "step": 1}),
+
+            }
+        }
+
+    RETURN_TYPES = ("CROPINFO", "IMAGE",)
+    RETURN_NAMES = ("crop_info", "keypoints_image",)
+    FUNCTION = "process"
+    CATEGORY = "LivePortrait"
+
+    def process(self, crop_info, offset_x, offset_y, scale):
+
+        keypoints = crop_info['lmk_crop'].copy()
+
+        # Create an offset array
+        # Calculate the centroid of the keypoints
+        centroid = keypoints.mean(axis=0)
+
+        # Translate keypoints to origin by subtracting the centroid
+        translated_keypoints = keypoints - centroid
+
+        # Scale the translated keypoints
+        scaled_keypoints = translated_keypoints * scale
+
+        # Translate scaled keypoints back to original position and then apply the offset
+        final_keypoints = scaled_keypoints + centroid + np.array([offset_x, offset_y])
+
+        crop_info['lmk_crop'] = final_keypoints
+
+        # Draw each landmark as a circle
+        width, height = 512, 512
+        blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
+        for (x, y) in final_keypoints:
+            # Ensure the coordinates are within the dimensions of the blank image
+            if 0 <= x < width and 0 <= y < height:
+                cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
+
+        keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
+        keypoints_image_tensor = torch.from_numpy(keypoints_image) / 255
+        keypoints_image_tensor = keypoints_image_tensor.unsqueeze(0).cpu().float()
+        print(keypoints_image_tensor.shape)
+        
+        return (crop_info, keypoints_image_tensor,)
+
 NODE_CLASS_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": DownloadAndLoadLivePortraitModels,
     "LivePortraitProcess": LivePortraitProcess,
+    "LivePortraitCropper": LivePortraitCropper,
+    "KeypointScaler": KeypointScaler
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": "(Down)Load LivePortraitModels",
     "LivePortraitProcess": "LivePortraitProcess",
+    "LivePortraitCropper": "LivePortraitCropper",
+    "KeypointScaler": "KeypointScaler"
     }
