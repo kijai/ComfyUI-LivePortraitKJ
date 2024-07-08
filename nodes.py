@@ -280,10 +280,12 @@ class LivePortraitProcess:
     RETURN_TYPES = (
         "IMAGE",
         "IMAGE",
+        "MASK",
     )
     RETURN_NAMES = (
         "cropped_images",
         "full_images",
+        "mask",
     )
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
@@ -330,7 +332,7 @@ class LivePortraitProcess:
         cropped_out_list = []
         full_out_list = []
 
-        cropped_out_list, full_out_list = pipeline.execute(
+        cropped_out_list, full_out_list, out_mask_list = pipeline.execute(
             source_np, driving_images_np, crop_info['crop_info'], mismatch_method
         )
         cropped_tensors_out = (
@@ -341,8 +343,16 @@ class LivePortraitProcess:
             torch.stack([torch.from_numpy(np_array) for np_array in full_out_list])
             / 255
         )
+        mask_tensors_out = (
+            torch.stack([torch.from_numpy(np_array) for np_array in out_mask_list])
+        )[:, :, :, 0]
+        print("mask out tensor: ", mask_tensors_out.shape)
 
-        return (cropped_tensors_out.cpu().float(), full_tensors_out.cpu().float())
+        return (
+            cropped_tensors_out.cpu().float(), 
+            full_tensors_out.cpu().float(), 
+            mask_tensors_out.cpu().float()
+            )
 
 
 class LivePortraitCropper:

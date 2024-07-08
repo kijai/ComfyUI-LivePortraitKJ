@@ -67,6 +67,7 @@ class LivePortraitPipeline(object):
         I_p_lst = []
         I_p_paste_lst = []
         driving_lmk_lst = []
+        out_mask_list = []
         R_d_0, x_d_0_info = None, None
 
         total_frames = driving_images_np.shape[0]
@@ -282,6 +283,7 @@ class LivePortraitPipeline(object):
                 I_p_i_to_ori_blend = I_p_i_to_ori
 
             I_p_paste_lst.append(I_p_i_to_ori_blend)
+            out_mask_list.append(mask_ori)
             pbar.update(1)
 
-        return I_p_lst, I_p_paste_lst
+        return I_p_lst, I_p_paste_lst, out_mask_list
