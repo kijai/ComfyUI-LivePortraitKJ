@@ -240,10 +240,10 @@ class LivePortraitProcess:
             "optional": {
                "onnx_device": (
                     [
-                        'CUDA',
                         'CPU',
+                        'CUDA',                        
                     ], {
-                        "default": 'CUDA'
+                        "default": 'CPU'
                     }),
             }
 
