@@ -13,6 +13,7 @@ from .utils.retargeting_utils import compute_eye_delta, compute_lip_delta
 from .utils.camera import headpose_pred_to_degree, get_rotation_matrix
 from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 from .config.inference_config import InferenceConfig
+from contextlib import nullcontext
 
 from comfy.model_management import get_autocast_device
 
@@ -79,9 +80,8 @@ class LivePortraitWrapper(object):
         """ get the appearance feature of the image by F
         x: Bx3xHxW, normalized to 0~1
         """
-        with torch.no_grad():
-            with torch.autocast(device_type=get_autocast_device(self.device_id), dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
-                feature_3d = self.appearance_feature_extractor(x)
+        with torch.autocast(get_autocast_device(self.device_id), dtype=torch.float16) if self.cfg.flag_use_half_precision else nullcontext():
+            feature_3d = self.appearance_feature_extractor(x)
 
         return feature_3d.float()
 
@@ -91,15 +91,14 @@ class LivePortraitWrapper(object):
         flag_refine_info: whether to trandform the pose to degrees and the dimention of the reshape
         return: A dict contains keys: 'pitch', 'yaw', 'roll', 't', 'exp', 'scale', 'kp'
         """
-        with torch.no_grad():
-            with torch.autocast(device_type=get_autocast_device(self.device_id), dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
-                kp_info = self.motion_extractor(x)
+        with torch.autocast(get_autocast_device(self.device_id), dtype=torch.float16) if self.cfg.flag_use_half_precision else nullcontext():
+            kp_info = self.motion_extractor(x)
 
-            if self.cfg.flag_use_half_precision:
-                # float the dict
-                for k, v in kp_info.items():
-                    if isinstance(v, torch.Tensor):
-                        kp_info[k] = v.float()
+        if self.cfg.flag_use_half_precision:
+            # float the dict
+            for k, v in kp_info.items():
+                if isinstance(v, torch.Tensor):
+                    kp_info[k] = v.float()
 
         flag_refine_info: bool = kwargs.get('flag_refine_info', True)
         if flag_refine_info:
@@ -265,19 +264,18 @@ class LivePortraitWrapper(object):
         kp_source: BxNx3
         kp_driving: BxNx3
         """
-        # The line 18 in Algorithm 1: D(W(f_s; x_s, x′_d,i)）
-        with torch.no_grad():
-            with torch.autocast(device_type=get_autocast_device(self.device_id), dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
-                # get decoder input
-                ret_dct = self.warping_module(feature_3d, kp_source=kp_source, kp_driving=kp_driving)
-                # decode
-                ret_dct['out'] = self.spade_generator(feature=ret_dct['out'])
+        # The line 18 in Algorithm 1: D(W(f_s; x_s, x′_d,i)
+        with torch.autocast(get_autocast_device(self.device_id), dtype=torch.float16) if self.cfg.flag_use_half_precision else nullcontext():
+            # get decoder input
+            ret_dct = self.warping_module(feature_3d, kp_source=kp_source, kp_driving=kp_driving)
+            # decode
+            ret_dct['out'] = self.spade_generator(feature=ret_dct['out'])
 
-            # float the dict
-            if self.cfg.flag_use_half_precision:
-                for k, v in ret_dct.items():
-                    if isinstance(v, torch.Tensor):
-                        ret_dct[k] = v.float()
+        # float the dict
+        if self.cfg.flag_use_half_precision:
+            for k, v in ret_dct.items():
+                if isinstance(v, torch.Tensor):
+                    ret_dct[k] = v.float()
 
         return ret_dct
 

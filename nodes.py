@@ -397,14 +397,10 @@ class LivePortraitCropper:
 
         keypoints_image_tensor = torch.from_numpy(keypoints_img) / 255
         keypoints_image_tensor = keypoints_image_tensor.unsqueeze(0).cpu().float()
-        print(keypoints_image_tensor.shape)
-        
 
         cropped_image = crop_info['img_crop_256x256']
         cropped_tensors = torch.from_numpy(cropped_image) / 255
         cropped_tensors = cropped_tensors.unsqueeze(0).cpu().float()
-        
-        print(cropped_tensors.shape)
 
         cropper_dict = {
             "cropper": cropper,
@@ -447,7 +443,7 @@ class KeypointScaler:
         # Translate scaled keypoints back to original position and then apply the offset
         final_keypoints = scaled_keypoints + centroid + np.array([offset_x, offset_y])
 
-        crop_info['crop_info']['lmk_crop'] = final_keypoints
+        crop_info['crop_info']['lmk_crop'] = final_keypoints #fix this
 
         # Draw each landmark as a circle
         width, height = 512, 512
