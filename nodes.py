@@ -237,6 +237,17 @@ class LivePortraitProcess:
             "stitching": ("BOOLEAN", {"default": True}),
             "relative": ("BOOLEAN", {"default": True}),
             },
+            "optional": {
+               "onnx_device": (
+                    [
+                        'CUDA',
+                        'CPU',
+                    ], {
+                        "default": 'CUDA'
+                    }),
+            }
+
+
         }
 
     RETURN_TYPES = ("IMAGE", "IMAGE",)
@@ -245,7 +256,7 @@ class LivePortraitProcess:
     CATEGORY = "LivePortrait"
 
     def process(self, source_image, driving_images, dsize, scale, vx_ratio, vy_ratio, pipeline, 
-                lip_zero, eye_retargeting, lip_retargeting, stitching, relative, eyes_retargeting_multiplier, lip_retargeting_multiplier):
+                lip_zero, eye_retargeting, lip_retargeting, stitching, relative, eyes_retargeting_multiplier, lip_retargeting_multiplier, onnx_device='CUDA'):
         source_image_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
 
@@ -256,7 +267,7 @@ class LivePortraitProcess:
             vy_ratio = vy_ratio,
             )
         
-        cropper = Cropper(crop_cfg=crop_cfg)
+        cropper = Cropper(crop_cfg=crop_cfg, provider=onnx_device)
         pipeline.cropper = cropper
         pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = eye_retargeting
         pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = eyes_retargeting_multiplier
