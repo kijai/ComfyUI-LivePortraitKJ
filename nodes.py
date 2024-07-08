@@ -315,7 +315,7 @@ class LivePortraitProcess:
         lip_retargeting_multiplier: float,
         mismatch_method: str = "repeat",
     ):
-        source_image_np = (source_image * 255).byte().numpy()
+        source_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
 
         crop_cfg = CropConfig(
@@ -341,8 +341,6 @@ class LivePortraitProcess:
 
         cropped_out_list = []
         full_out_list = []
-
-        source_np = (source_image * 255).byte().numpy()
 
         cropped_out_list, full_out_list = pipeline.execute(
             source_np, driving_images_np, mismatch_method

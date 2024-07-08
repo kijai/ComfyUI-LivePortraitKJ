@@ -20,7 +20,7 @@ from .utils.crop import _transform_img
 # from .utils.retargeting_utils import calc_lip_close_ratio
 # from .utils.io import load_image_rgb, load_driving_info
 # from .utils.helper import mkdir, basename, dct2cuda, is_video, is_template, resize_to_limit
-from .utils.helper import resize_to_limit
+# from .utils.helper import resize_to_limit
 
 # from .utils.rprint import rlog as log
 from .live_portrait_wrapper import LivePortraitWrapper
@@ -81,14 +81,11 @@ class LivePortraitPipeline(object):
         pbar = comfy.utils.ProgressBar(total_frames)
 
         for i in range(total_frames):
-            source_frame = self._get_source_frame(
+            source_frame_rgb = self._get_source_frame(
                 source_np, i, total_frames, mismatch_method
             )
             driving_frame = driving_images_np[i]
 
-            source_frame_rgb = resize_to_limit(
-                source_frame, inference_cfg.ref_max_shape, inference_cfg.ref_shape_n
-            )
             crop_info = self.cropper.crop_single_image(source_frame_rgb)
             source_lmk = crop_info["lmk_crop"]
             img_crop, img_crop_256x256 = (
