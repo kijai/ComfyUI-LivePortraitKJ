@@ -60,7 +60,7 @@ class LivePortraitPipeline(object):
             ]
 
     def execute(
-        self, source_np, driving_images_np, mismatch_method="repeat", reference_frame=0
+        self, source_np, driving_images_np, crop_info, mismatch_method="repeat", reference_frame=0
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
 
@@ -82,7 +82,7 @@ class LivePortraitPipeline(object):
             )
             driving_frame = driving_images_np[i]
 
-            crop_info = self.cropper.crop_single_image(source_frame_rgb)
+            crop_info, _ = self.cropper.crop_single_image(source_frame_rgb)
             source_lmk = crop_info["lmk_crop"]
             _, img_crop_256x256 = (
                 crop_info["img_crop"],
@@ -106,7 +106,7 @@ class LivePortraitPipeline(object):
                 c_d_lip_before_animation = [0.0]
                 combined_lip_ratio_tensor_before_animation = (
                     self.live_portrait_wrapper.calc_combined_lip_ratio(
-                        c_d_lip_before_animation, source_lmk
+                        c_d_lip_before_animation, source_lmk, inference_cfg
                     )
                 )
                 # TODO: expose lip_zero_threshold
