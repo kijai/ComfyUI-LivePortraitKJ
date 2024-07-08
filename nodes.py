@@ -95,6 +95,15 @@ class DownloadAndLoadLivePortraitModels:
     def INPUT_TYPES(s):
         return {"required": {
             },
+            "optional": {
+                 "precision": (
+                    [
+                        'fp16',
+                        'fp32',
+                    ], {
+                        "default": 'fp16'
+                    }),
+            }
         }
 
     RETURN_TYPES = ("LIVEPORTRAITPIPE",)
@@ -102,7 +111,7 @@ class DownloadAndLoadLivePortraitModels:
     FUNCTION = "loadmodel"
     CATEGORY = "LivePortrait"
 
-    def loadmodel(self):
+    def loadmodel(self, precision='fp16'):
         device = mm.get_torch_device()
         mm.soft_empty_cache()
 
@@ -200,7 +209,10 @@ class DownloadAndLoadLivePortraitModels:
             self.warping_module,
             self.spade_generator,
             self.stich_retargeting_module,
-            InferenceConfig(device_id=device)
+            InferenceConfig(
+                device_id=device, 
+                flag_use_half_precision = True if precision == 'fp16' else False
+                )
         )
 
         return (pipeline,)
