@@ -117,7 +117,12 @@ class DownloadAndLoadLivePortraitModels:
 
         pbar = comfy.utils.ProgressBar(3)
 
-        download_path = os.path.join(folder_paths.models_dir, "liveportrait")
+        # Set the models directory. If no `liveportrait` is added to e.g. extra_model_paths.yaml
+        # then the default path is used under /models.
+        if "liveportrait" not in folder_paths.folder_names_and_paths:
+            default_liveportrait_dir = os.path.join(folder_paths.models_dir, "liveportrait")
+            folder_paths.add_model_folder_path("liveportrait", default_liveportrait_dir)
+        download_path = folder_paths.get_folder_paths("liveportrait")[0]
         model_path = os.path.join(download_path)
 
         if not os.path.exists(model_path):

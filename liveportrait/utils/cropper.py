@@ -36,9 +36,15 @@ class Trajectory:
 class Cropper(object):
     def __init__(self, provider, **kwargs) -> None:
         device_id = kwargs.get('device_id', 0)
+
+        if "liveportrait" not in folder_paths.folder_names_and_paths:
+            default_liveportrait_dir = os.path.join(folder_paths.models_dir, "liveportrait")
+            folder_paths.add_model_folder_path("liveportrait", default_liveportrait_dir)
+        model_path = folder_paths.get_folder_paths("liveportrait")[0]
+
         self.landmark_runner = LandmarkRunner(
             #ckpt_path=make_abs_path('../../pretrained_weights/liveportrait/landmark.onnx'),
-            ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark.onnx'),
+            ckpt_path=os.path.join(model_path, 'landmark.onnx'),
             onnx_provider=provider,
             device_id=device_id
         )
