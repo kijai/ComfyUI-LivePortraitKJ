@@ -34,12 +34,12 @@ class Trajectory:
 
 
 class Cropper(object):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, provider, **kwargs) -> None:
         device_id = kwargs.get('device_id', 0)
         self.landmark_runner = LandmarkRunner(
             #ckpt_path=make_abs_path('../../pretrained_weights/liveportrait/landmark.onnx'),
             ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark.onnx'),
-            onnx_provider='cuda',
+            onnx_provider=provider,
             device_id=device_id
         )
         self.landmark_runner.warmup()
@@ -47,7 +47,7 @@ class Cropper(object):
         self.face_analysis_wrapper = FaceAnalysisDIY(
             name='buffalo_l',
             root=os.path.join(folder_paths.models_dir, 'insightface'),
-            providers=["CUDAExecutionProvider"]
+            providers=[provider + 'ExecutionProvider',]
         )
         self.face_analysis_wrapper.prepare(ctx_id=device_id, det_size=(512, 512))
         self.face_analysis_wrapper.warmup()

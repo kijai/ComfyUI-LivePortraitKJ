@@ -58,8 +58,8 @@ def calc_lip_close_ratio(lmk: np.ndarray) -> np.ndarray:
 def compute_eye_delta(frame_idx, input_eye_ratios, source_landmarks, portrait_wrapper, kp_source):
     input_eye_ratio = input_eye_ratios[frame_idx][0][0]
     eye_close_ratio = calc_eye_close_ratio(source_landmarks[None])
-    eye_close_ratio_tensor = torch.from_numpy(eye_close_ratio).float().cuda(portrait_wrapper.device_id)
-    input_eye_ratio_tensor = torch.Tensor([input_eye_ratio]).reshape(1, 1).cuda(portrait_wrapper.device_id)
+    eye_close_ratio_tensor = torch.from_numpy(eye_close_ratio).float().to(portrait_wrapper.device_id)
+    input_eye_ratio_tensor = torch.Tensor([input_eye_ratio]).reshape(1, 1).to(portrait_wrapper.device_id)
     combined_eye_ratio_tensor = torch.cat([eye_close_ratio_tensor, input_eye_ratio_tensor], dim=1)
     # print(combined_eye_ratio_tensor.mean())
     eye_delta = portrait_wrapper.retarget_eye(kp_source, combined_eye_ratio_tensor)
@@ -69,8 +69,8 @@ def compute_eye_delta(frame_idx, input_eye_ratios, source_landmarks, portrait_wr
 def compute_lip_delta(frame_idx, input_lip_ratios, source_landmarks, portrait_wrapper, kp_source):
     input_lip_ratio = input_lip_ratios[frame_idx][0]
     lip_close_ratio = calc_lip_close_ratio(source_landmarks[None])
-    lip_close_ratio_tensor = torch.from_numpy(lip_close_ratio).float().cuda(portrait_wrapper.device_id)
-    input_lip_ratio_tensor = torch.Tensor([input_lip_ratio]).cuda(portrait_wrapper.device_id)
+    lip_close_ratio_tensor = torch.from_numpy(lip_close_ratio).float().to(portrait_wrapper.device_id)
+    input_lip_ratio_tensor = torch.Tensor([input_lip_ratio]).to(portrait_wrapper.device_id)
     combined_lip_ratio_tensor = torch.cat([lip_close_ratio_tensor, input_lip_ratio_tensor], dim=1)
     lip_delta = portrait_wrapper.retarget_lip(kp_source, combined_lip_ratio_tensor)
     return lip_delta

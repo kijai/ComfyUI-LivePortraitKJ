@@ -3,21 +3,18 @@
 """
 Wrapper for LivePortrait core functions
 """
-
-import os.path as osp
 import numpy as np
 import cv2
 import torch
-import yaml
 
 from .utils.timer import Timer
-from .utils.helper import load_model, concat_feat
+from .utils.helper import concat_feat
 from .utils.retargeting_utils import compute_eye_delta, compute_lip_delta
 from .utils.camera import headpose_pred_to_degree, get_rotation_matrix
 from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 from .config.inference_config import InferenceConfig
-from .utils.rprint import rlog as log
 
+from comfy.model_management import get_autocast_device
 
 class LivePortraitWrapper(object):
 
@@ -57,7 +54,7 @@ class LivePortraitWrapper(object):
             raise ValueError(f'img ndim should be 3 or 4: {x.ndim}')
         x = np.clip(x, 0, 1)  # clip to 0~1
         x = torch.from_numpy(x).permute(0, 3, 1, 2)  # 1xHxWx3 -> 1x3xHxW
-        x = x.cuda(self.device_id)
+        x = x.to(self.device_id)
         return x
 
     def prepare_driving_videos(self, imgs) -> torch.Tensor:
@@ -74,7 +71,7 @@ class LivePortraitWrapper(object):
         y = _imgs.astype(np.float32) / 255.
         y = np.clip(y, 0, 1)  # clip to 0~1
         y = torch.from_numpy(y).permute(0, 4, 3, 1, 2)  # TxHxWx3x1 -> Tx1x3xHxW
-        y = y.cuda(self.device_id)
+        y = y.to(self.device_id)
 
         return y
 
@@ -83,7 +80,7 @@ class LivePortraitWrapper(object):
         x: Bx3xHxW, normalized to 0~1
         """
         with torch.no_grad():
-            with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
+            with torch.autocast(device_type=get_autocast_device(self.device_id), dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
                 feature_3d = self.appearance_feature_extractor(x)
 
         return feature_3d.float()
@@ -95,7 +92,7 @@ class LivePortraitWrapper(object):
         return: A dict contains keys: 'pitch', 'yaw', 'roll', 't', 'exp', 'scale', 'kp'
         """
         with torch.no_grad():
-            with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
+            with torch.autocast(device_type=get_autocast_device(self.device_id), dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
                 kp_info = self.motion_extractor(x)
 
             if self.cfg.flag_use_half_precision:
@@ -270,7 +267,7 @@ class LivePortraitWrapper(object):
         """
         # The line 18 in Algorithm 1: D(W(f_s; x_s, x′_d,i)）
         with torch.no_grad():
-            with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
+            with torch.autocast(device_type=get_autocast_device(self.device_id), dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
                 # get decoder input
                 ret_dct = self.warping_module(feature_3d, kp_source=kp_source, kp_driving=kp_driving)
                 # decode
@@ -306,17 +303,17 @@ class LivePortraitWrapper(object):
 
     def calc_combined_eye_ratio(self, input_eye_ratio, source_lmk):
         eye_close_ratio = calc_eye_close_ratio(source_lmk[None])
-        eye_close_ratio_tensor = torch.from_numpy(eye_close_ratio).float().cuda(self.device_id)
-        input_eye_ratio_tensor = torch.Tensor([input_eye_ratio[0][0]]).reshape(1, 1).cuda(self.device_id)
+        eye_close_ratio_tensor = torch.from_numpy(eye_close_ratio).float().to(self.device_id)
+        input_eye_ratio_tensor = torch.Tensor([input_eye_ratio[0][0]]).reshape(1, 1).to(self.device_id)
         # [c_s,eyes, c_d,eyes,i]
         combined_eye_ratio_tensor = torch.cat([eye_close_ratio_tensor, input_eye_ratio_tensor], dim=1)
         return combined_eye_ratio_tensor
 
     def calc_combined_lip_ratio(self, input_lip_ratio, source_lmk):
         lip_close_ratio = calc_lip_close_ratio(source_lmk[None])
-        lip_close_ratio_tensor = torch.from_numpy(lip_close_ratio).float().cuda(self.device_id)
+        lip_close_ratio_tensor = torch.from_numpy(lip_close_ratio).float().to(self.device_id)
         # [c_s,lip, c_d,lip,i]
-        input_lip_ratio_tensor = torch.Tensor([input_lip_ratio[0]]).cuda(self.device_id)
+        input_lip_ratio_tensor = torch.Tensor([input_lip_ratio[0]]).to(self.device_id)
         if input_lip_ratio_tensor.shape != [1, 1]:
             input_lip_ratio_tensor = input_lip_ratio_tensor.reshape(1, 1)
         combined_lip_ratio_tensor = torch.cat([lip_close_ratio_tensor, input_lip_ratio_tensor], dim=1)
