@@ -316,11 +316,13 @@ class LivePortraitProcess:
         pipeline.live_portrait_wrapper.cfg.flag_relative = relative
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
 
+        pipeline.cropper = crop_info['cropper']
+
         cropped_out_list = []
         full_out_list = []
 
         cropped_out_list, full_out_list = pipeline.execute(
-            source_np, driving_images_np, crop_info, mismatch_method
+            source_np, driving_images_np, crop_info['crop_info'], mismatch_method
         )
         cropped_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in cropped_out_list])
@@ -385,7 +387,12 @@ class LivePortraitCropper:
         
         print(cropped_tensors.shape)
 
-        return (cropped_tensors, crop_info, keypoints_image_tensor)
+        cropper_dict = {
+            "cropper": cropper,
+            "crop_info": crop_info,
+        }
+
+        return (cropped_tensors, cropper_dict, keypoints_image_tensor)
 
 class KeypointScaler:
     @classmethod
@@ -406,7 +413,7 @@ class KeypointScaler:
 
     def process(self, crop_info, offset_x, offset_y, scale):
 
-        keypoints = crop_info['lmk_crop'].copy()
+        keypoints = crop_info['crop_info']['lmk_crop'].copy()
 
         # Create an offset array
         # Calculate the centroid of the keypoints
@@ -421,7 +428,7 @@ class KeypointScaler:
         # Translate scaled keypoints back to original position and then apply the offset
         final_keypoints = scaled_keypoints + centroid + np.array([offset_x, offset_y])
 
-        crop_info['lmk_crop'] = final_keypoints
+        crop_info['crop_info']['lmk_crop'] = final_keypoints
 
         # Draw each landmark as a circle
         width, height = 512, 512
