@@ -77,6 +77,7 @@ class LivePortraitPipeline(object):
         I_p_lst = []
         I_p_paste_lst = []
         driving_lmk_lst = []
+        R_d_0, x_d_0_info = None, None
 
         total_frames = driving_images_np.shape[0]
 
@@ -150,11 +151,17 @@ class LivePortraitPipeline(object):
                 x_d_info["pitch"], x_d_info["yaw"], x_d_info["roll"]
             )
 
+            if i == 0:
+                R_d_0 = R_d
+                x_d_0_info = x_d_info
+
             if inference_cfg.flag_relative:
-                R_new = R_d @ R_s
-                delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_s_info["exp"])
-                scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_s_info["scale"])
-                t_new = x_s_info["t"] + (x_d_info["t"] - x_s_info["t"])
+                R_new = (R_d @ R_d_0.permute(0, 2, 1)) @ R_s
+                delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_d_0_info["exp"])
+                scale_new = x_s_info["scale"] * (
+                    x_d_info["scale"] / x_d_0_info["scale"]
+                )
+                t_new = x_s_info["t"] + (x_d_info["t"] - x_d_0_info["t"])
             else:
                 R_new = R_d
                 delta_new = x_d_info["exp"]
