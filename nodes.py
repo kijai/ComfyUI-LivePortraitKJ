@@ -7,7 +7,6 @@ import comfy.utils
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
-from .liveportrait.config.argument_config import ArgumentConfig
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
 from .liveportrait.utils.cropper import Cropper
 from .liveportrait.modules.spade_generator import SPADEDecoder

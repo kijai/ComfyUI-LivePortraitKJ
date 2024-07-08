@@ -11,18 +11,8 @@ import os.path as osp
 import numpy as np
 from .config.inference_config import InferenceConfig
 
-# from .utils.cropper import Cropper
 from .utils.camera import get_rotation_matrix
 from .utils.crop import _transform_img
-
-# from .utils.video import images2video, concat_frames
-
-# from .utils.retargeting_utils import calc_lip_close_ratio
-# from .utils.io import load_image_rgb, load_driving_info
-# from .utils.helper import mkdir, basename, dct2cuda, is_video, is_template, resize_to_limit
-# from .utils.helper import resize_to_limit
-
-# from .utils.rprint import rlog as log
 from .live_portrait_wrapper import LivePortraitWrapper
 
 
