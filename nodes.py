@@ -104,17 +104,17 @@ class ArgumentConfig:
 class DownloadAndLoadLivePortraitModels:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {
-            },
+        return {
+            "required": {},
             "optional": {
-                 "precision": (
+                "precision": (
                     [
-                        'fp16',
-                        'fp32',
-                    ], {
-                        "default": 'fp16'
-                    }),
-            }
+                        "fp16",
+                        "fp32",
+                    ],
+                    {"default": "fp16"},
+                ),
+            },
         }
 
     RETURN_TYPES = ("LIVEPORTRAITPIPE",)
@@ -122,7 +122,7 @@ class DownloadAndLoadLivePortraitModels:
     FUNCTION = "loadmodel"
     CATEGORY = "LivePortrait"
 
-    def loadmodel(self, precision='fp16'):
+    def loadmodel(self, precision="fp16"):
         device = mm.get_torch_device()
         mm.soft_empty_cache()
 
@@ -246,9 +246,9 @@ class DownloadAndLoadLivePortraitModels:
             self.spade_generator,
             self.stich_retargeting_module,
             InferenceConfig(
-                device_id=device, 
-                flag_use_half_precision = True if precision == 'fp16' else False
-                )
+                device_id=device,
+                flag_use_half_precision=True if precision == "fp16" else False,
+            ),
         )
 
         return (pipeline,)
@@ -258,38 +258,51 @@ class DownloadAndLoadLivePortraitModels:
 class LivePortraitProcess:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {
-
-            "pipeline": ("LIVEPORTRAITPIPE",),
-            "source_image": ("IMAGE",),
-            "driving_images": ("IMAGE",),
-            "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
-            "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01}),
-            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
-            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
-            "lip_zero": ("BOOLEAN", {"default": True}),
-            "eye_retargeting": ("BOOLEAN", {"default": False}),
-            "eyes_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
-            "lip_retargeting": ("BOOLEAN", {"default": False}),
-            "lip_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
-            "stitching": ("BOOLEAN", {"default": True}),
-            "relative": ("BOOLEAN", {"default": True}),
+        return {
+            "required": {
+                "pipeline": ("LIVEPORTRAITPIPE",),
+                "source_image": ("IMAGE",),
+                "driving_images": ("IMAGE",),
+                "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
+                "scale": (
+                    "FLOAT",
+                    {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01},
+                ),
+                "vx_ratio": (
+                    "FLOAT",
+                    {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01},
+                ),
+                "vy_ratio": (
+                    "FLOAT",
+                    {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01},
+                ),
+                "lip_zero": ("BOOLEAN", {"default": True}),
+                "eye_retargeting": ("BOOLEAN", {"default": False}),
+                "eyes_retargeting_multiplier": (
+                    "FLOAT",
+                    {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001},
+                ),
+                "lip_retargeting": ("BOOLEAN", {"default": False}),
+                "lip_retargeting_multiplier": (
+                    "FLOAT",
+                    {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001},
+                ),
+                "stitching": ("BOOLEAN", {"default": True}),
+                "relative": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                 "mismatch_method": (
+                "mismatch_method": (
                     ["repeat", "cycle", "mirror", "nearest"],
                     {"default": "repeat"},
                 ),
-               "onnx_device": (
+                "onnx_device": (
                     [
-                        'CPU',
-                        'CUDA',                        
-                    ], {
-                        "default": 'CPU'
-                    }),
-            }
-
-
+                        "CPU",
+                        "CUDA",
+                    ],
+                    {"default": "CPU"},
+                ),
+            },
         }
 
     RETURN_TYPES = (
@@ -320,7 +333,8 @@ class LivePortraitProcess:
         eyes_retargeting_multiplier: float,
         lip_retargeting_multiplier: float,
         mismatch_method: str = "repeat",
-    , onnx_device='CUDA'):
+        onnx_device="CUDA",
+    ):
         source_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
 
@@ -370,4 +384,3 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": "(Down)Load LivePortraitModels",
 }
-
