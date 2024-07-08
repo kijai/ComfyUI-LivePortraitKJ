@@ -256,7 +256,6 @@ class DownloadAndLoadLivePortraitModels:
         return (pipeline,)
 
 
-# OUR CURRENT NODE
 class LivePortraitProcess:
     @classmethod
     def INPUT_TYPES(s):
@@ -291,10 +290,7 @@ class LivePortraitProcess:
         self,
         source_image: torch.Tensor,
         driving_images: torch.Tensor,
-        dsize: int,
-        scale: float,
-        vx_ratio: float,
-        vy_ratio: float,
+        crop_info: dict,
         pipeline: LivePortraitPipeline,
         lip_zero: bool,
         eye_retargeting: bool,
@@ -304,7 +300,6 @@ class LivePortraitProcess:
         eyes_retargeting_multiplier: float,
         lip_retargeting_multiplier: float,
         mismatch_method: str = "repeat",
-        onnx_device="CUDA",
     ):
         source_np = (source_image * 255).byte().numpy()
         driving_images_np = (driving_images * 255).byte().numpy()
@@ -325,7 +320,7 @@ class LivePortraitProcess:
         full_out_list = []
 
         cropped_out_list, full_out_list = pipeline.execute(
-            source_np, driving_images_np, mismatch_method
+            source_np, driving_images_np, crop_info, mismatch_method
         )
         cropped_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in cropped_out_list])

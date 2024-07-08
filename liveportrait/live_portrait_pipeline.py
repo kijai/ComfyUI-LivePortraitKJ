@@ -120,25 +120,6 @@ class LivePortraitPipeline(object):
             )
             f_s = self.live_portrait_wrapper.extract_feature_3d(I_s)
             x_s = self.live_portrait_wrapper.transform_keypoint(x_s_info)
-    def execute(self, img_rgb, driving_images_np, crop_info):
-        inference_cfg = self.live_portrait_wrapper.cfg # for convenience
-        ######## process reference portrait ########
-        #img_rgb = load_image_rgb(args.source_image)
-        #img_rgb = resize_to_limit(img_rgb, inference_cfg.ref_max_shape, inference_cfg.ref_shape_n)
-        #log(f"Load source image from {args.source_image}")
-        #crop_info = self.cropper.crop_single_image(img_rgb)
-        source_lmk = crop_info['lmk_crop']
-        #_, img_crop_256x256 = crop_info['img_crop'], crop_info['img_crop_256x256']
-        img_crop_256x256 = img_rgb
-        if inference_cfg.flag_do_crop:
-            I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
-        else:
-            I_s = self.live_portrait_wrapper.prepare_source(img_rgb)
-        x_s_info = self.live_portrait_wrapper.get_kp_info(I_s)
-        x_c_s = x_s_info['kp']
-        R_s = get_rotation_matrix(x_s_info['pitch'], x_s_info['yaw'], x_s_info['roll'])
-        f_s = self.live_portrait_wrapper.extract_feature_3d(I_s)
-        x_s = self.live_portrait_wrapper.transform_keypoint(x_s_info)
 
             if inference_cfg.flag_lip_zero:
                 c_d_lip_before_animation = [0.0]
