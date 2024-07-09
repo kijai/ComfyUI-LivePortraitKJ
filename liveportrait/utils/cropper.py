@@ -1,27 +1,17 @@
 # coding: utf-8
 
 import numpy as np
-import os.path as osp
 from typing import List, Union, Tuple
 from dataclasses import dataclass, field
 import cv2; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
 
 from .landmark_runner import LandmarkRunner
 from .face_analysis_diy import FaceAnalysisDIY
-#from .helper import prefix
 from .crop import crop_image, crop_image_by_bbox, parse_bbox_from_landmark, average_bbox_lst
-#from .timer import Timer
-from .rprint import rlog as log
-from .io import load_image_rgb
-#from .video import VideoWriter, get_fps, change_video_fps
 
 import folder_paths
 import os
 script_directory = os.path.dirname(os.path.abspath(__file__))
-
-def make_abs_path(fn):
-    return osp.join(osp.dirname(osp.realpath(__file__)), fn)
-
 
 @dataclass
 class Trajectory:
@@ -37,7 +27,6 @@ class Cropper(object):
     def __init__(self, provider, **kwargs) -> None:
         device_id = kwargs.get('device_id', 0)
         self.landmark_runner = LandmarkRunner(
-            #ckpt_path=make_abs_path('../../pretrained_weights/liveportrait/landmark.onnx'),
             ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark.onnx'),
             onnx_provider=provider,
             device_id=device_id
@@ -59,14 +48,8 @@ class Cropper(object):
             if hasattr(self.crop_cfg, k):
                 setattr(self.crop_cfg, k, v)
 
-    def crop_single_image(self, obj, draw_keypoints, **kwargs):
+    def crop_single_image(self, img_rgb, draw_keypoints, **kwargs):
         direction = kwargs.get('direction', 'large-small')
-
-        # crop and align a single image
-        if isinstance(obj, str):
-            img_rgb = load_image_rgb(obj)
-        elif isinstance(obj, np.ndarray):
-            img_rgb = obj
 
         src_face = self.face_analysis_wrapper.get(
             img_rgb,
@@ -75,10 +58,9 @@ class Cropper(object):
         )
 
         if len(src_face) == 0:
-            log('No face detected in the source image.')
             raise Exception("No face detected in the source image!")
         #elif len(src_face) > 1:
-        #    log(f'More than one face detected in the image, only pick one face by rule {direction}.')
+        #    print(f'More than one face detected in the image, only pick one face by rule {direction}.')
 
         src_face = src_face[self.crop_cfg.face_index]
         pts = src_face.landmark_2d_106
@@ -138,7 +120,7 @@ class Cropper(object):
                     # No face detected in the driving_image
                     continue
                 elif len(src_face) > 1:
-                    log(f'More than one face detected in the driving frame_{idx}, only pick one face by rule {direction}.')
+                    print(f'More than one face detected in the driving frame_{idx}, only pick one face by rule {direction}.')
                 src_face = src_face[0]
                 pts = src_face.landmark_2d_106
                 lmk_203 = self.landmark_runner(driving_image, pts)['pts']

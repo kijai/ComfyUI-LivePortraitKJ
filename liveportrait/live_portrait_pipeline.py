@@ -7,7 +7,6 @@ Pipeline of LivePortrait
 import cv2
 import comfy.utils
 from tqdm import tqdm
-import os.path as osp
 import numpy as np
 from .config.inference_config import InferenceConfig
 
@@ -15,10 +14,8 @@ from .utils.camera import get_rotation_matrix
 from .utils.crop import _transform_img
 from .live_portrait_wrapper import LivePortraitWrapper
 
-
-def make_abs_path(fn):
-    return osp.join(osp.dirname(osp.realpath(__file__)), fn)
-
+import os
+script_directory = os.path.dirname(os.path.abspath(__file__))
 
 class LivePortraitPipeline(object):
     def __init__(
@@ -43,7 +40,7 @@ class LivePortraitPipeline(object):
         if source_np.shape[0] == 1:
             return source_np[0]
 
-        if method == "repeat":
+        if method == "constant":
             return source_np[min(idx, source_np.shape[0] - 1)]
         elif method == "cycle":
             return source_np[idx % source_np.shape[0]]
@@ -60,7 +57,7 @@ class LivePortraitPipeline(object):
             ]
 
     def execute(
-        self, source_np, driving_images_np, crop_info, mismatch_method="repeat", reference_frame=0
+        self, source_np, driving_images_np, crop_info, mismatch_method="constant", reference_frame=0
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
 
@@ -110,7 +107,6 @@ class LivePortraitPipeline(object):
                         c_d_lip_before_animation, source_lmk
                     )
                 )
-                # TODO: expose lip_zero_threshold
                 if (
                     combined_lip_ratio_tensor_before_animation[0][0]
                     < inference_cfg.lip_zero_threshold
@@ -266,10 +262,7 @@ class LivePortraitPipeline(object):
 
             if inference_cfg.flag_pasteback:
                 if inference_cfg.mask_crop is None:
-                    inference_cfg.mask_crop = cv2.imread(
-                        make_abs_path("./utils/resources/mask_template.png"),
-                        cv2.IMREAD_COLOR,
-                    )
+                    inference_cfg.mask_crop = cv2.imread(os.path.join(script_directory, "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
                 mask_ori = _transform_img(
                     inference_cfg.mask_crop,
                     crop_info["M_c2o"],

@@ -1,5 +1,4 @@
 pyyaml
 numpy
 opencv-python
-rich
 onnxruntime-gpu

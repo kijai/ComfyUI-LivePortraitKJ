@@ -36,12 +36,8 @@ class InferenceConfig:
         flag_lip_retargeting=False,
         flag_stitching=True,
         flag_relative=True,
-        anchor_frame=0,
         input_shape=(256, 256),
-        flag_write_result=True,
         flag_pasteback=True,
-        ref_max_shape=1280,
-        ref_shape_n=2,
         device_id=0,
         flag_do_crop=True,
         flag_do_rot=True,
@@ -53,12 +49,8 @@ class InferenceConfig:
         self.flag_lip_retargeting = flag_lip_retargeting
         self.flag_stitching = flag_stitching
         self.flag_relative = flag_relative
-        self.anchor_frame = anchor_frame
         self.input_shape = input_shape
-        self.flag_write_result = flag_write_result
         self.flag_pasteback = flag_pasteback
-        self.ref_max_shape = ref_max_shape
-        self.ref_shape_n = ref_shape_n
         self.device_id = device_id
         self.flag_do_crop = flag_do_crop
         self.flag_do_rot = flag_do_rot
@@ -72,39 +64,6 @@ class CropConfig:
         self.vx_ratio = vx_ratio
         self.vy_ratio = vy_ratio
         self.face_index = face_index
-
-
-class ArgumentConfig:
-    def __init__(
-        self,
-        device_id=0,
-        flag_lip_zero=True,
-        flag_eye_retargeting=False,
-        flag_lip_retargeting=False,
-        flag_stitching=True,
-        flag_relative=True,
-        flag_pasteback=True,
-        flag_do_crop=True,
-        flag_do_rot=True,
-        dsize=512,
-        scale=2.3,
-        vx_ratio=0,
-        vy_ratio=-0.125,
-    ):
-        self.device_id = device_id
-        self.flag_lip_zero = flag_lip_zero
-        self.flag_eye_retargeting = flag_eye_retargeting
-        self.flag_lip_retargeting = flag_lip_retargeting
-        self.flag_stitching = flag_stitching
-        self.flag_relative = flag_relative
-        self.flag_pasteback = flag_pasteback
-        self.flag_do_crop = flag_do_crop
-        self.flag_do_rot = flag_do_rot
-        self.dsize = dsize
-        self.scale = scale
-        self.vx_ratio = vx_ratio
-        self.vy_ratio = vy_ratio
-
 
 class DownloadAndLoadLivePortraitModels:
     @classmethod
@@ -278,12 +237,12 @@ class LivePortraitProcess:
             "relative": ("BOOLEAN", {"default": True}),
             "mismatch_method": (
                     [
-                        "repeat",
+                        "constant",
                         "cycle",
                         "mirror",
                         "nearest",
                     ],
-                    {"default": "repeat"},
+                    {"default": "constant"},
                 ),
             },
             "optional": {
@@ -318,7 +277,7 @@ class LivePortraitProcess:
         relative: bool,
         eyes_retargeting_multiplier: float,
         lip_retargeting_multiplier: float,
-        mismatch_method: str = "repeat",
+        mismatch_method: str = "constant",
         mask: torch.Tensor = None,
     ):
         source_np = (source_image * 255).byte().numpy()

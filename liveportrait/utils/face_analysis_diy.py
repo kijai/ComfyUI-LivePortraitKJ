@@ -5,7 +5,6 @@ face detectoin and alignment using InsightFace
 """
 
 import numpy as np
-from .rprint import rlog as log
 from insightface.app import FaceAnalysis
 from insightface.app.common import Face
 from .timer import Timer
@@ -76,4 +75,4 @@ class FaceAnalysisDIY(FaceAnalysis):
         self.get(img_bgr)
 
         elapse = self.timer.toc()
-        log(f'FaceAnalysisDIY warmup time: {elapse:.3f}s')
+        print(f'FaceAnalysisDIY warmup time: {elapse:.3f}s')

@@ -6,7 +6,6 @@ cropping function and the related preprocess functions for cropping
 
 import cv2; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False) # NOTE: enforce single thread
 import numpy as np
-from .rprint import rprint as print
 from math import sin, cos, acos, degrees
 
 DTYPE = np.float32
