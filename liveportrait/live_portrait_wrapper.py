@@ -301,17 +301,19 @@ class LivePortraitWrapper(object):
 
     def calc_combined_eye_ratio(self, input_eye_ratio, source_lmk):
         eye_close_ratio = calc_eye_close_ratio(source_lmk[None])
-        eye_close_ratio_tensor = torch.from_numpy(eye_close_ratio).float().to(self.device_id)
-        input_eye_ratio_tensor = torch.Tensor([input_eye_ratio[0][0]]).reshape(1, 1).to(self.device_id)
+        eye_close_ratios_tensor = torch.from_numpy(eye_close_ratio).float().to(self.device_id)
+        input_eye_ratio_array = np.array(input_eye_ratio[0][0]).reshape(1, 1)
+        input_eye_ratio_tensor = torch.from_numpy(input_eye_ratio_array).float().to(self.device_id)
         # [c_s,eyes, c_d,eyes,i]
-        combined_eye_ratio_tensor = torch.cat([eye_close_ratio_tensor, input_eye_ratio_tensor], dim=1)
-        return combined_eye_ratio_tensor
+        combined_eye_ratios_tensor = torch.cat([eye_close_ratios_tensor, input_eye_ratio_tensor], dim=1)
+        return combined_eye_ratios_tensor
 
     def calc_combined_lip_ratio(self, input_lip_ratio, source_lmk):
         lip_close_ratio = calc_lip_close_ratio(source_lmk[None])
         lip_close_ratio_tensor = torch.from_numpy(lip_close_ratio).float().to(self.device_id)
         # [c_s,lip, c_d,lip,i]
-        input_lip_ratio_tensor = torch.Tensor([input_lip_ratio[0]]).to(self.device_id)
+        input_lip_ratio_array = np.array([input_lip_ratio[0]])
+        input_lip_ratio_tensor = torch.from_numpy(input_lip_ratio_array).float().to(self.device_id)
         if input_lip_ratio_tensor.shape != [1, 1]:
             input_lip_ratio_tensor = input_lip_ratio_tensor.reshape(1, 1)
         combined_lip_ratio_tensor = torch.cat([lip_close_ratio_tensor, input_lip_ratio_tensor], dim=1)
