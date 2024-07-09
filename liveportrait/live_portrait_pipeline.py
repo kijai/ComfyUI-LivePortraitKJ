@@ -72,7 +72,7 @@ class LivePortraitPipeline(object):
         pbar = comfy.utils.ProgressBar(total_frames)
 
         if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-            driving_landmark_list = self.cropper.get_retargeting_lmk_info(driving_images_np)
+            driving_landmark_list = crop_info["driving_landmark_list"]
 
         for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
             source_frame_rgb = self._get_source_frame(
@@ -80,9 +80,9 @@ class LivePortraitPipeline(object):
             )
             driving_frame = driving_images_np[i]
 
-            safe_index = min(i, len(crop_info) - 1)
-            source_lmk = crop_info[safe_index]["lmk_crop"]
-            img_crop_256x256 = crop_info[safe_index]["img_crop_256x256"]
+            safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
+            source_lmk = crop_info["crop_info_list"][safe_index]["lmk_crop"]
+            img_crop_256x256 = crop_info["crop_info_list"][safe_index]["img_crop_256x256"]
 
             if inference_cfg.flag_do_crop:
                 I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
@@ -123,7 +123,6 @@ class LivePortraitPipeline(object):
             )[0]
 
             if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-                # driving_landmark_list = self.cropper.get_retargeting_lmk_info([driving_frame])
                 input_eye_ratio_lst, input_lip_ratio_lst = (
                     self.live_portrait_wrapper.calc_retargeting_ratio(
                         source_lmk, driving_landmark_list
@@ -253,7 +252,7 @@ class LivePortraitPipeline(object):
             # Transform and blend
             I_p_i_to_ori = _transform_img(
                 I_p_i,
-                crop_info[safe_index]["M_c2o"],
+                crop_info["crop_info_list"][safe_index]["M_c2o"],
                 dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
             )
 
@@ -262,7 +261,7 @@ class LivePortraitPipeline(object):
                     inference_cfg.mask_crop = cv2.imread(os.path.join(script_directory, "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
                 mask_ori = _transform_img(
                     inference_cfg.mask_crop,
-                    crop_info[safe_index]["M_c2o"],
+                    crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
                 )
                 mask_ori = mask_ori.astype(np.float32) / 255.0

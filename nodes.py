@@ -339,6 +339,9 @@ class LivePortraitCropper:
                     }),
             "keep_model_loaded": ("BOOLEAN", {"default": True})
             },
+            "optional": {
+                "opt_driving_images": ("IMAGE",),
+            }
            
         }
 
@@ -347,19 +350,12 @@ class LivePortraitCropper:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, keep_model_loaded, onnx_device='CUDA'):
+    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, keep_model_loaded, onnx_device='CUDA', opt_driving_images=None):
         source_image_np = (source_image * 255).byte().numpy()
 
         cropper_init_config = {
             'keep_model_loaded': keep_model_loaded,
             'onnx_device': onnx_device
-        }
-        crop_config = {
-            "dsize" : dsize,
-            "scale" : scale,
-            "vx_ratio" : vx_ratio,
-            "vy_ratio" : vy_ratio,
-            "face_index" : face_index,  
         }
         
         if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
@@ -367,11 +363,20 @@ class LivePortraitCropper:
             self.cropper = Cropper(**cropper_init_config)
 
         crop_info_list = []
+
+        if opt_driving_images is not None:
+            driving_images_np = (opt_driving_images * 255).byte().numpy()
+            driving_landmark_list = []
        
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
             crop_info = self.cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index)
             crop_info_list.append(crop_info)
+
+            if opt_driving_images is not None:
+                driving_crop_dict = self.cropper.crop_single_image(driving_images_np[i], dsize, scale, vy_ratio, vx_ratio, face_index)
+                driving_landmark_list.append(driving_crop_dict['lmk_crop'])
+              
             pbar.update(1)
         
         if not keep_model_loaded:
@@ -382,7 +387,14 @@ class LivePortraitCropper:
         cropped_tensors = torch.from_numpy(cropped_image) / 255
         cropped_tensors = cropped_tensors.unsqueeze(0).cpu().float()
 
-        return (cropped_tensors, crop_info_list)
+        crop_info_dict = {
+            'crop_info_list': crop_info_list
+        }
+
+        if opt_driving_images is not None:
+            crop_info_dict['driving_landmark_list'] = driving_landmark_list
+
+        return (cropped_tensors, crop_info_dict)
 
 class KeypointsToImage:
     @classmethod
@@ -398,10 +410,10 @@ class KeypointsToImage:
     CATEGORY = "LivePortrait"
 
     def drawkeypoints(self, crop_info):
-        height, width = crop_info[0]['input_image_size']
+        height, width = crop_info["crop_info_list"][0]['input_image_size']
         keypoints_img_list = []
         pbar = comfy.utils.ProgressBar(len(crop_info))
-        for crop in crop_info:
+        for crop in crop_info["crop_info_list"]:
             keypoints = crop['lmk_crop'].copy()
             # Draw each landmark as a circle
             blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
