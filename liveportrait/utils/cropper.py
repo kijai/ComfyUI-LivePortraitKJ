@@ -59,7 +59,7 @@ class Cropper(object):
             if hasattr(self.crop_cfg, k):
                 setattr(self.crop_cfg, k, v)
 
-    def crop_single_image(self, obj, **kwargs):
+    def crop_single_image(self, obj, draw_keypoints, **kwargs):
         direction = kwargs.get('direction', 'large-small')
 
         # crop and align a single image
@@ -77,8 +77,8 @@ class Cropper(object):
         if len(src_face) == 0:
             log('No face detected in the source image.')
             raise Exception("No face detected in the source image!")
-        elif len(src_face) > 1:
-            log(f'More than one face detected in the image, only pick one face by rule {direction}.')
+        #elif len(src_face) > 1:
+        #    log(f'More than one face detected in the image, only pick one face by rule {direction}.')
 
         src_face = src_face[self.crop_cfg.face_index]
         pts = src_face.landmark_2d_106
@@ -101,16 +101,20 @@ class Cropper(object):
         ret_dct['lmk_crop'] = lmk
 
         # Draw each landmark as a circle
-        height, width = img_rgb.shape[:2]
-        blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
-        for (x, y) in lmk:
-            # Ensure the coordinates are within the dimensions of the blank image
-            if 0 <= x < width and 0 <= y < height:
-                cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
+        if draw_keypoints:
+            print("Drawing keypoints...")
+            height, width = img_rgb.shape[:2]
+            blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
+            for (x, y) in lmk:
+                # Ensure the coordinates are within the dimensions of the blank image
+                if 0 <= x < width and 0 <= y < height:
+                    cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
 
-        keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
+            keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
 
-        return ret_dct, keypoints_image
+            return ret_dct, keypoints_image
+        else:
+            return ret_dct
 
     def get_retargeting_lmk_info(self, driving_rgb_lst):
         # TODO: implement a tracking-based version

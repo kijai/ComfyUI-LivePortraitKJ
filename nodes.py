@@ -405,7 +405,7 @@ class LivePortraitCropper:
             )
         
         cropper = Cropper(crop_cfg=crop_cfg, provider=onnx_device)
-        crop_info, keypoints_img = cropper.crop_single_image(source_image_np[0])
+        crop_info, keypoints_img = cropper.crop_single_image(source_image_np[0], draw_keypoints=True)
 
         keypoints_image_tensor = torch.from_numpy(keypoints_img) / 255
         keypoints_image_tensor = keypoints_image_tensor.unsqueeze(0).cpu().float()

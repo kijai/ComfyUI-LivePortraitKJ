@@ -83,7 +83,7 @@ class LivePortraitPipeline(object):
             )
             driving_frame = driving_images_np[i]
 
-            crop_info, _ = self.cropper.crop_single_image(source_frame_rgb)
+            crop_info = self.cropper.crop_single_image(source_frame_rgb, draw_keypoints=False)
             source_lmk = crop_info["lmk_crop"]
             _, img_crop_256x256 = (
                 crop_info["img_crop"],
