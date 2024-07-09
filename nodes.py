@@ -57,15 +57,6 @@ class InferenceConfig:
         self.flag_do_rot = flag_do_rot
         self.mask_crop = mask_crop
 
-
-class CropConfig:
-    def __init__(self, dsize=512, scale=2.3, vx_ratio=0, vy_ratio=-0.125, face_index=0):
-        self.dsize = dsize
-        self.scale = scale
-        self.vx_ratio = vx_ratio
-        self.vy_ratio = vy_ratio
-        self.face_index = face_index
-
 class DownloadAndLoadLivePortraitModels:
     @classmethod
     def INPUT_TYPES(s):
@@ -346,7 +337,9 @@ class LivePortraitCropper:
                     ['CPU', 'CUDA', 'ROCM'], {
                         "default": 'CPU'
                     }),
+            "keep_model_loaded": ("BOOLEAN", {"default": True})
             },
+           
         }
 
     RETURN_TYPES = ("IMAGE", "CROPINFO",)
@@ -354,26 +347,36 @@ class LivePortraitCropper:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, onnx_device='CUDA'):
+    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, keep_model_loaded, onnx_device='CUDA'):
         source_image_np = (source_image * 255).byte().numpy()
 
-        crop_cfg = CropConfig(
-            dsize = dsize,
-            scale = scale,
-            vx_ratio = vx_ratio,
-            vy_ratio = vy_ratio,
-            face_index = face_index
-            )
+        cropper_init_config = {
+            'keep_model_loaded': keep_model_loaded,
+            'onnx_device': onnx_device
+        }
+        crop_config = {
+            "dsize" : dsize,
+            "scale" : scale,
+            "vx_ratio" : vx_ratio,
+            "vy_ratio" : vy_ratio,
+            "face_index" : face_index,  
+        }
         
-        cropper = Cropper(crop_cfg=crop_cfg, provider=onnx_device)
+        if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
+            self.current_config = cropper_init_config
+            self.cropper = Cropper(**cropper_init_config)
 
         crop_info_list = []
        
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
-            crop_info = cropper.crop_single_image(source_image_np[i])
+            crop_info = self.cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index)
             crop_info_list.append(crop_info)
             pbar.update(1)
+        
+        if not keep_model_loaded:
+            self.cropper = None
+            mm.soft_empty_cache()
 
         cropped_image = crop_info['img_crop_256x256']
         cropped_tensors = torch.from_numpy(cropped_image) / 255

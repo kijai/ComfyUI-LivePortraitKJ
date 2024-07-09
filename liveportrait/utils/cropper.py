@@ -24,8 +24,9 @@ class Trajectory:
 
 
 class Cropper(object):
-    def __init__(self, provider, **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         device_id = kwargs.get('device_id', 0)
+        provider = kwargs.get('onnx_device', 'CPU')
         self.landmark_runner = LandmarkRunner(
             ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark.onnx'),
             onnx_provider=provider,
@@ -41,17 +42,8 @@ class Cropper(object):
         self.face_analysis_wrapper.prepare(ctx_id=device_id, det_size=(512, 512))
         self.face_analysis_wrapper.warmup()
 
-        self.crop_cfg = kwargs.get('crop_cfg', None)
-
-    def update_config(self, user_args):
-        for k, v in user_args.items():
-            if hasattr(self.crop_cfg, k):
-                setattr(self.crop_cfg, k, v)
-
-    def crop_single_image(self, img_rgb, **kwargs):
-        direction = kwargs.get('direction', 'large-small')
-
-        
+    def crop_single_image(self, img_rgb, dsize, scale, vy_ratio, vx_ratio, face_index):
+        direction = 'large-small'
 
         src_face = self.face_analysis_wrapper.get(
             img_rgb,
@@ -64,20 +56,21 @@ class Cropper(object):
         #elif len(src_face) > 1:
         #    print(f'More than one face detected in the image, only pick one face by rule {direction}.')
 
-        src_face = src_face[self.crop_cfg.face_index] # choose the index if multiple faces detected
+        src_face = src_face[face_index] # choose the index if multiple faces detected
         pts = src_face.landmark_2d_106
        
         # crop the face
         ret_dct = crop_image(
             img_rgb,  # ndarray
             pts,  # 106x2 or Nx2
-            dsize=kwargs.get('dsize', 512),
-            scale=kwargs.get('scale', 2.3),
-            vy_ratio=kwargs.get('vy_ratio', -0.15),
+            dsize=dsize,
+            scale=scale,
+            vy_ratio=vy_ratio,
+            vx_ratio=vx_ratio
         )
         # update a 256x256 version for network input or else
         ret_dct['img_crop_256x256'] = cv2.resize(ret_dct['img_crop'], (256, 256), interpolation=cv2.INTER_AREA)
-        ret_dct['pt_crop_256x256'] = ret_dct['pt_crop'] * 256 / kwargs.get('dsize', 512)
+        ret_dct['pt_crop_256x256'] = ret_dct['pt_crop'] * 256 / dsize
 
         input_image_size = img_rgb.shape[:2]
         ret_dct['input_image_size'] = input_image_size
