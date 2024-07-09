@@ -107,7 +107,7 @@ class LivePortraitPipeline(object):
                 c_d_lip_before_animation = [0.0]
                 combined_lip_ratio_tensor_before_animation = (
                     self.live_portrait_wrapper.calc_combined_lip_ratio(
-                        c_d_lip_before_animation, source_lmk, inference_cfg
+                        c_d_lip_before_animation, source_lmk
                     )
                 )
                 # TODO: expose lip_zero_threshold

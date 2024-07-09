@@ -21,6 +21,9 @@ from .liveportrait.modules.stitching_retargeting_network import (
     StitchingRetargetingNetwork,
 )
 
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log = logging.getLogger(__name__)
 
 class InferenceConfig:
     def __init__(
@@ -134,7 +137,7 @@ class DownloadAndLoadLivePortraitModels:
         model_path = os.path.join(download_path)
 
         if not os.path.exists(model_path):
-            print(f"Downloading model to: {model_path}")
+            log.info(f"Downloading model to: {model_path}")
             from huggingface_hub import snapshot_download
 
             snapshot_download(
@@ -170,7 +173,7 @@ class DownloadAndLoadLivePortraitModels:
             comfy.utils.load_torch_file(feature_extractor_path)
         )
         self.appearance_feature_extractor.eval()
-        print("Load appearance_feature_extractor done.")
+        log.info("Load appearance_feature_extractor done.")
         pbar.update(1)
         # init M
         model_params = model_config["model_params"]["motion_extractor_params"]
@@ -179,7 +182,7 @@ class DownloadAndLoadLivePortraitModels:
             comfy.utils.load_torch_file(motion_extractor_path)
         )
         self.motion_extractor.eval()
-        print("Load motion_extractor done.")
+        log.info("Load motion_extractor done.")
         pbar.update(1)
         # init W
         model_params = model_config["model_params"]["warping_module_params"]
@@ -188,7 +191,7 @@ class DownloadAndLoadLivePortraitModels:
             comfy.utils.load_torch_file(warping_module_path)
         )
         self.warping_module.eval()
-        print("Load warping_module done.")
+        log.info("Load warping_module done.")
         pbar.update(1)
         # init G
         model_params = model_config["model_params"]["spade_generator_params"]
@@ -197,7 +200,7 @@ class DownloadAndLoadLivePortraitModels:
             comfy.utils.load_torch_file(spade_generator_path)
         )
         self.spade_generator.eval()
-        print("Load spade_generator done.")
+        log.info("Load spade_generator done.")
         pbar.update(1)
 
         def filter_checkpoint_for_model(checkpoint, prefix):
@@ -233,7 +236,7 @@ class DownloadAndLoadLivePortraitModels:
         retargetor_eye.load_state_dict(eye_checkpoint)
         retargetor_eye = retargetor_eye.to(device)
         retargetor_eye.eval()
-        print("Load stitching_retargeting_module done.")
+        log.info("Load stitching_retargeting_module done.")
 
         self.stich_retargeting_module = {
             "stitching": stitcher,
@@ -266,6 +269,7 @@ class LivePortraitProcess:
             "source_image": ("IMAGE",),
             "driving_images": ("IMAGE",),
             "lip_zero": ("BOOLEAN", {"default": True}),
+            "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.01, "max": 4.0, "step": 0.001}),
             "eye_retargeting": ("BOOLEAN", {"default": False}),
             "eyes_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
             "lip_retargeting": ("BOOLEAN", {"default": False}),
@@ -307,6 +311,7 @@ class LivePortraitProcess:
         crop_info: dict,
         pipeline: LivePortraitPipeline,
         lip_zero: bool,
+        lip_zero_threshold: float,
         eye_retargeting: bool,
         lip_retargeting: bool,
         stitching: bool,
@@ -330,6 +335,10 @@ class LivePortraitProcess:
         pipeline.live_portrait_wrapper.cfg.flag_stitching = stitching
         pipeline.live_portrait_wrapper.cfg.flag_relative = relative
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
+        pipeline.live_portrait_wrapper.cfg.lip_zero_threshold = lip_zero_threshold
+
+        if lip_zero and (lip_retargeting or eye_retargeting):
+            log.warning("Warning: lip_zero only has an effect with lip or eye retargeting")
 
         if mask is not None:
             crop_mask = mask[0].cpu().numpy()
@@ -356,7 +365,6 @@ class LivePortraitProcess:
         mask_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in out_mask_list])
         )[:, :, :, 0]
-        print("mask out tensor: ", mask_tensors_out.shape)
 
         return (
             cropped_tensors_out.cpu().float(), 
@@ -468,7 +476,6 @@ class KeypointScaler:
         keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
         keypoints_image_tensor = torch.from_numpy(keypoints_image) / 255
         keypoints_image_tensor = keypoints_image_tensor.unsqueeze(0).cpu().float()
-        print(keypoints_image_tensor.shape)
         
         return (crop_info, keypoints_image_tensor,)
 
