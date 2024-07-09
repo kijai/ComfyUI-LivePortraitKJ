@@ -42,7 +42,7 @@ class Cropper(object):
         self.face_analysis_wrapper.prepare(ctx_id=device_id, det_size=(512, 512))
         self.face_analysis_wrapper.warmup()
 
-    def crop_single_image(self, img_rgb, dsize, scale, vy_ratio, vx_ratio, face_index):
+    def crop_single_image(self, img_rgb, dsize, scale, vy_ratio, vx_ratio, face_index, rotate):
         direction = 'large-small'
 
         src_face = self.face_analysis_wrapper.get(
@@ -66,7 +66,8 @@ class Cropper(object):
             dsize=dsize,
             scale=scale,
             vy_ratio=vy_ratio,
-            vx_ratio=vx_ratio
+            vx_ratio=vx_ratio,
+            rotate=rotate
         )
         # update a 256x256 version for network input or else
         ret_dct['img_crop_256x256'] = cv2.resize(ret_dct['img_crop'], (256, 256), interpolation=cv2.INTER_AREA)

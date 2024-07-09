@@ -357,7 +357,7 @@ def crop_image(img, pts: np.ndarray, **kwargs):
         scale=scale,
         vy_ratio=vy_ratio,
         vx_ratio=vx_ratio,
-        flag_do_rot=kwargs.get('flag_do_rot', True),
+        flag_do_rot=kwargs.get('rotate', True),
     )
 
     if img is None:

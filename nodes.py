@@ -333,6 +333,7 @@ class LivePortraitCropper:
             "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
             "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
             "face_index": ("INT", {"default": 0, "min": 0, "max": 100}),
+            "rotate": ("BOOLEAN", {"default": True}),
             "onnx_device": (
                     ['CPU', 'CUDA', 'ROCM'], {
                         "default": 'CPU'
@@ -350,7 +351,7 @@ class LivePortraitCropper:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, keep_model_loaded, onnx_device='CUDA', opt_driving_images=None):
+    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, rotate, keep_model_loaded, onnx_device='CUDA', opt_driving_images=None):
         source_image_np = (source_image * 255).byte().numpy()
 
         cropper_init_config = {
@@ -371,13 +372,13 @@ class LivePortraitCropper:
        
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
-            crop_info = self.cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index)
+            crop_info = self.cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, rotate)
             crop_info_list.append(crop_info)
             cropped_image = crop_info['img_crop_256x256']
             cropped_images_list.append(cropped_image)
 
             if opt_driving_images is not None:
-                driving_crop_dict = self.cropper.crop_single_image(driving_images_np[i], dsize, scale, vy_ratio, vx_ratio, face_index)
+                driving_crop_dict = self.cropper.crop_single_image(driving_images_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, rotate)
                 driving_landmark_list.append(driving_crop_dict['lmk_crop'])
               
             pbar.update(1)
