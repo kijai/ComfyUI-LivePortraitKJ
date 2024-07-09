@@ -296,6 +296,9 @@ class LivePortraitProcess:
             crop_mask = (crop_mask * 255).astype(np.uint8)
             crop_mask = np.repeat(np.atleast_3d(crop_mask), 3, axis=2)
             pipeline.live_portrait_wrapper.cfg.mask_crop = crop_mask
+        else:
+            crop_mask = None
+            pipeline.live_portrait_wrapper.cfg.mask_crop = None
 
         cropped_out_list = []
         full_out_list = []
