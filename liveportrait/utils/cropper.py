@@ -80,7 +80,7 @@ class Cropper(object):
         elif len(src_face) > 1:
             log(f'More than one face detected in the image, only pick one face by rule {direction}.')
 
-        src_face = src_face[0]
+        src_face = src_face[self.crop_cfg.face_index]
         pts = src_face.landmark_2d_106
        
 

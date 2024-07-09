@@ -63,11 +63,12 @@ class InferenceConfig:
 
 
 class CropConfig:
-    def __init__(self, dsize=512, scale=2.3, vx_ratio=0, vy_ratio=-0.125):
+    def __init__(self, dsize=512, scale=2.3, vx_ratio=0, vy_ratio=-0.125, face_index=0):
         self.dsize = dsize
         self.scale = scale
         self.vx_ratio = vx_ratio
         self.vy_ratio = vy_ratio
+        self.face_index = face_index
 
 
 class ArgumentConfig:
@@ -365,6 +366,7 @@ class LivePortraitCropper:
             "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01}),
             "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
             "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
+            "face_index": ("INT", {"default": 0, "min": 0, "max": 100}),
             },
             "optional": {
                "onnx_device": (
@@ -382,7 +384,7 @@ class LivePortraitCropper:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, onnx_device='CUDA'):
+    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, onnx_device='CUDA'):
         source_image_np = (source_image * 255).byte().numpy()
 
         crop_cfg = CropConfig(
@@ -390,6 +392,7 @@ class LivePortraitCropper:
             scale = scale,
             vx_ratio = vx_ratio,
             vy_ratio = vy_ratio,
+            face_index = face_index
             )
         
         cropper = Cropper(crop_cfg=crop_cfg, provider=onnx_device)
