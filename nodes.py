@@ -363,6 +363,7 @@ class LivePortraitCropper:
             self.cropper = Cropper(**cropper_init_config)
 
         crop_info_list = []
+        cropped_images_list = []
 
         if opt_driving_images is not None:
             driving_images_np = (opt_driving_images * 255).byte().numpy()
@@ -372,6 +373,8 @@ class LivePortraitCropper:
         for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
             crop_info = self.cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index)
             crop_info_list.append(crop_info)
+            cropped_image = crop_info['img_crop_256x256']
+            cropped_images_list.append(cropped_image)
 
             if opt_driving_images is not None:
                 driving_crop_dict = self.cropper.crop_single_image(driving_images_np[i], dsize, scale, vy_ratio, vx_ratio, face_index)
@@ -383,9 +386,11 @@ class LivePortraitCropper:
             self.cropper = None
             mm.soft_empty_cache()
 
-        cropped_image = crop_info['img_crop_256x256']
-        cropped_tensors = torch.from_numpy(cropped_image) / 255
-        cropped_tensors = cropped_tensors.unsqueeze(0).cpu().float()
+        
+        cropped_tensors_out = (
+            torch.stack([torch.from_numpy(np_array) for np_array in cropped_images_list])
+            / 255
+        )
 
         crop_info_dict = {
             'crop_info_list': crop_info_list
@@ -394,7 +399,8 @@ class LivePortraitCropper:
         if opt_driving_images is not None:
             crop_info_dict['driving_landmark_list'] = driving_landmark_list
 
-        return (cropped_tensors, crop_info_dict)
+        return (cropped_tensors_out, crop_info_dict)
+
 
 class KeypointsToImage:
     @classmethod
