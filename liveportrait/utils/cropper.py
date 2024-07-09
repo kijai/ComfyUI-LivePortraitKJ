@@ -3,11 +3,11 @@
 import numpy as np
 from typing import List, Union, Tuple
 from dataclasses import dataclass, field
-import cv2; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
+import cv2#; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
 
 from .landmark_runner import LandmarkRunner
 from .face_analysis_diy import FaceAnalysisDIY
-from .crop import crop_image, crop_image_by_bbox, parse_bbox_from_landmark, average_bbox_lst
+from .crop import crop_image
 
 import folder_paths
 import os
@@ -15,8 +15,8 @@ script_directory = os.path.dirname(os.path.abspath(__file__))
 
 @dataclass
 class Trajectory:
-    start: int = -1  # 起始帧 闭区间
-    end: int = -1  # 结束帧 闭区间
+    start: int = -1
+    end: int = -1
     lmk_lst: Union[Tuple, List, np.ndarray] = field(default_factory=list)  # lmk list
     bbox_lst: Union[Tuple, List, np.ndarray] = field(default_factory=list)  # bbox list
     frame_rgb_lst: Union[Tuple, List, np.ndarray] = field(default_factory=list)  # frame list
@@ -48,8 +48,10 @@ class Cropper(object):
             if hasattr(self.crop_cfg, k):
                 setattr(self.crop_cfg, k, v)
 
-    def crop_single_image(self, img_rgb, draw_keypoints, **kwargs):
+    def crop_single_image(self, img_rgb, **kwargs):
         direction = kwargs.get('direction', 'large-small')
+
+        
 
         src_face = self.face_analysis_wrapper.get(
             img_rgb,
@@ -62,10 +64,9 @@ class Cropper(object):
         #elif len(src_face) > 1:
         #    print(f'More than one face detected in the image, only pick one face by rule {direction}.')
 
-        src_face = src_face[self.crop_cfg.face_index]
+        src_face = src_face[self.crop_cfg.face_index] # choose the index if multiple faces detected
         pts = src_face.landmark_2d_106
        
-
         # crop the face
         ret_dct = crop_image(
             img_rgb,  # ndarray
@@ -78,67 +79,19 @@ class Cropper(object):
         ret_dct['img_crop_256x256'] = cv2.resize(ret_dct['img_crop'], (256, 256), interpolation=cv2.INTER_AREA)
         ret_dct['pt_crop_256x256'] = ret_dct['pt_crop'] * 256 / kwargs.get('dsize', 512)
 
+        input_image_size = img_rgb.shape[:2]
+        ret_dct['input_image_size'] = input_image_size
+    
         recon_ret = self.landmark_runner.run(img_rgb, pts)
         lmk = recon_ret['pts']
         ret_dct['lmk_crop'] = lmk
 
-        # Draw each landmark as a circle
-        if draw_keypoints:
-            print("Drawing keypoints...")
-            height, width = img_rgb.shape[:2]
-            blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
-            for (x, y) in lmk:
-                # Ensure the coordinates are within the dimensions of the blank image
-                if 0 <= x < width and 0 <= y < height:
-                    cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
-
-            keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
-
-            return ret_dct, keypoints_image
-        else:
-            return ret_dct
+        return ret_dct
 
     def get_retargeting_lmk_info(self, driving_rgb_lst):
         # TODO: implement a tracking-based version
         driving_lmk_lst = []
         for driving_image in driving_rgb_lst:
-            ret_dct = self.crop_single_image(driving_image, draw_keypoints=False)
+            ret_dct = self.crop_single_image(driving_image)
             driving_lmk_lst.append(ret_dct['lmk_crop'])
         return driving_lmk_lst
-
-    def make_video_clip(self, driving_rgb_lst, output_path, output_fps=30, **kwargs):
-        trajectory = Trajectory()
-        direction = kwargs.get('direction', 'large-small')
-        for idx, driving_image in enumerate(driving_rgb_lst):
-            if idx == 0 or trajectory.start == -1:
-                src_face = self.face_analysis_wrapper.get(
-                    driving_image,
-                    flag_do_landmark_2d_106=True,
-                    direction=direction
-                )
-                if len(src_face) == 0:
-                    # No face detected in the driving_image
-                    continue
-                elif len(src_face) > 1:
-                    print(f'More than one face detected in the driving frame_{idx}, only pick one face by rule {direction}.')
-                src_face = src_face[0]
-                pts = src_face.landmark_2d_106
-                lmk_203 = self.landmark_runner(driving_image, pts)['pts']
-                trajectory.start, trajectory.end = idx, idx
-            else:
-                lmk_203 = self.face_recon_wrapper(driving_image, trajectory.lmk_lst[-1])['pts']
-                trajectory.end = idx
-
-            trajectory.lmk_lst.append(lmk_203)
-            ret_bbox = parse_bbox_from_landmark(lmk_203, scale=self.crop_cfg.globalscale, vy_ratio=elf.crop_cfg.vy_ratio)['bbox']
-            bbox = [ret_bbox[0, 0], ret_bbox[0, 1], ret_bbox[2, 0], ret_bbox[2, 1]]  # 4,
-            trajectory.bbox_lst.append(bbox)  # bbox
-            trajectory.frame_rgb_lst.append(driving_image)
-
-        global_bbox = average_bbox_lst(trajectory.bbox_lst)
-        for idx, (frame_rgb, lmk) in enumerate(zip(trajectory.frame_rgb_lst, trajectory.lmk_lst)):
-            ret_dct = crop_image_by_bbox(
-                frame_rgb, global_bbox, lmk=lmk,
-                dsize=self.video_crop_cfg.dsize, flag_rot=self.video_crop_cfg.flag_rot, borderValue=self.video_crop_cfg.borderValue
-            )
-            frame_rgb_crop = ret_dct['img_crop']

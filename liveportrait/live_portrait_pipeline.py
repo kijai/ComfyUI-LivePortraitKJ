@@ -61,9 +61,9 @@ class LivePortraitPipeline(object):
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
 
-        I_p_lst = []
-        I_p_paste_lst = []
-        driving_lmk_lst = []
+        cropped_image_list = []
+        composited_image_list = []
+        driving_landmark_list = []
         out_mask_list = []
         R_d_0, x_d_0_info = None, None
 
@@ -72,20 +72,16 @@ class LivePortraitPipeline(object):
         pbar = comfy.utils.ProgressBar(total_frames)
 
         if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-            driving_lmk_lst = self.cropper.get_retargeting_lmk_info(driving_images_np)
+            driving_landmark_list = self.cropper.get_retargeting_lmk_info(driving_images_np)
 
         for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
             source_frame_rgb = self._get_source_frame(
                 source_np, i, total_frames, mismatch_method
             )
             driving_frame = driving_images_np[i]
-
-            crop_info = self.cropper.crop_single_image(source_frame_rgb, draw_keypoints=False)
-            source_lmk = crop_info["lmk_crop"]
-            _, img_crop_256x256 = (
-                crop_info["img_crop"],
-                crop_info["img_crop_256x256"],
-            )
+            
+            source_lmk = crop_info[i]["lmk_crop"]
+            img_crop_256x256 = crop_info[i]["img_crop_256x256"]
 
             if inference_cfg.flag_do_crop:
                 I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
@@ -126,10 +122,10 @@ class LivePortraitPipeline(object):
             )[0]
 
             if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-                # driving_lmk_lst = self.cropper.get_retargeting_lmk_info([driving_frame])
+                # driving_landmark_list = self.cropper.get_retargeting_lmk_info([driving_frame])
                 input_eye_ratio_lst, input_lip_ratio_lst = (
                     self.live_portrait_wrapper.calc_retargeting_ratio(
-                        source_lmk, driving_lmk_lst
+                        source_lmk, driving_landmark_list
                     )
                 )
 
@@ -251,12 +247,12 @@ class LivePortraitPipeline(object):
 
             out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
             I_p_i = self.live_portrait_wrapper.parse_output(out["out"])[0]
-            I_p_lst.append(I_p_i)
+            cropped_image_list.append(I_p_i)
 
             # Transform and blend
             I_p_i_to_ori = _transform_img(
                 I_p_i,
-                crop_info["M_c2o"],
+                crop_info[i]["M_c2o"],
                 dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
             )
 
@@ -265,18 +261,16 @@ class LivePortraitPipeline(object):
                     inference_cfg.mask_crop = cv2.imread(os.path.join(script_directory, "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
                 mask_ori = _transform_img(
                     inference_cfg.mask_crop,
-                    crop_info["M_c2o"],
+                    crop_info[i]["M_c2o"],
                     dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
                 )
                 mask_ori = mask_ori.astype(np.float32) / 255.0
                 I_p_i_to_ori_blend = np.clip(
                     mask_ori * I_p_i_to_ori + (1 - mask_ori) * source_frame_rgb, 0, 255
                 ).astype(np.uint8)
-            else:
-                I_p_i_to_ori_blend = I_p_i_to_ori
 
-            I_p_paste_lst.append(I_p_i_to_ori_blend)
+            composited_image_list.append(I_p_i_to_ori_blend)
             out_mask_list.append(mask_ori)
             pbar.update(1)
 
-        return I_p_lst, I_p_paste_lst, out_mask_list
+        return cropped_image_list, composited_image_list, out_mask_list

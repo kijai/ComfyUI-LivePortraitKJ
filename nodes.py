@@ -6,6 +6,7 @@ import comfy.model_management as mm
 import comfy.utils
 import numpy as np
 import cv2
+from tqdm import tqdm
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -224,7 +225,7 @@ class LivePortraitProcess:
         return {"required": {
 
             "pipeline": ("LIVEPORTRAITPIPE",),
-            "crop_info": ("CROPINFO", {"default": {}}),
+            "crop_info": ("CROPINFO", {"default": []}),
             "source_image": ("IMAGE",),
             "driving_images": ("IMAGE",),
             "lip_zero": ("BOOLEAN", {"default": True}),
@@ -267,7 +268,7 @@ class LivePortraitProcess:
         self,
         source_image: torch.Tensor,
         driving_images: torch.Tensor,
-        crop_info: dict,
+        crop_info: list,
         pipeline: LivePortraitPipeline,
         lip_zero: bool,
         lip_zero_threshold: float,
@@ -305,13 +306,11 @@ class LivePortraitProcess:
             crop_mask = np.repeat(np.atleast_3d(crop_mask), 3, axis=2)
             pipeline.live_portrait_wrapper.cfg.mask_crop = crop_mask
 
-        pipeline.cropper = crop_info['cropper']
-
         cropped_out_list = []
         full_out_list = []
 
         cropped_out_list, full_out_list, out_mask_list = pipeline.execute(
-            source_np, driving_images_np, crop_info['crop_info'], mismatch_method
+            source_np, driving_images_np, crop_info, mismatch_method
         )
         cropped_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in cropped_out_list])
@@ -343,20 +342,15 @@ class LivePortraitCropper:
             "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
             "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
             "face_index": ("INT", {"default": 0, "min": 0, "max": 100}),
-            },
-            "optional": {
-               "onnx_device": (
-                    [
-                        'CPU',
-                        'CUDA',
-                    ], {
+            "onnx_device": (
+                    ['CPU', 'CUDA', 'ROCM'], {
                         "default": 'CPU'
                     }),
-            }
+            },
         }
 
-    RETURN_TYPES = ("IMAGE", "CROPINFO", "IMAGE",)
-    RETURN_NAMES = ("cropped_image", "crop_info", "keypoints_image",)
+    RETURN_TYPES = ("IMAGE", "CROPINFO",)
+    RETURN_NAMES = ("cropped_image", "crop_info",)
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
@@ -372,21 +366,56 @@ class LivePortraitCropper:
             )
         
         cropper = Cropper(crop_cfg=crop_cfg, provider=onnx_device)
-        crop_info, keypoints_img = cropper.crop_single_image(source_image_np[0], draw_keypoints=True)
 
-        keypoints_image_tensor = torch.from_numpy(keypoints_img) / 255
-        keypoints_image_tensor = keypoints_image_tensor.unsqueeze(0).cpu().float()
+        crop_info_list = []
+       
+        pbar = comfy.utils.ProgressBar(len(source_image_np))
+        for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
+            crop_info = cropper.crop_single_image(source_image_np[i])
+            crop_info_list.append(crop_info)
+            pbar.update(1)
 
         cropped_image = crop_info['img_crop_256x256']
         cropped_tensors = torch.from_numpy(cropped_image) / 255
         cropped_tensors = cropped_tensors.unsqueeze(0).cpu().float()
 
-        cropper_dict = {
-            "cropper": cropper,
-            "crop_info": crop_info,
+        return (cropped_tensors, crop_info_list)
+
+class KeypointsToImage:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "crop_info": ("CROPINFO", {"default": []}),
+            },
         }
 
-        return (cropped_tensors, cropper_dict, keypoints_image_tensor)
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("keypoints_image",)
+    FUNCTION = "drawkeypoints"
+    CATEGORY = "LivePortrait"
+
+    def drawkeypoints(self, crop_info):
+        height, width = crop_info[0]['input_image_size']
+        keypoints_img_list = []
+        pbar = comfy.utils.ProgressBar(len(crop_info))
+        for crop in crop_info:
+            keypoints = crop['lmk_crop'].copy()
+            # Draw each landmark as a circle
+            blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
+            for (x, y) in keypoints:
+                # Ensure the coordinates are within the dimensions of the blank image
+                if 0 <= x < width and 0 <= y < height:
+                    cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
+
+            keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
+            keypoints_img_list.append(keypoints_image)
+            pbar.update(1)
+
+        keypoints_img_tensor = (
+            torch.stack([torch.from_numpy(np_array) for np_array in keypoints_img_list]) / 255).float()
+
+
+        return (keypoints_img_tensor,)
 
 class KeypointScaler:
     @classmethod
@@ -442,11 +471,13 @@ NODE_CLASS_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": DownloadAndLoadLivePortraitModels,
     "LivePortraitProcess": LivePortraitProcess,
     "LivePortraitCropper": LivePortraitCropper,
-    "KeypointScaler": KeypointScaler
+    "KeypointScaler": KeypointScaler,
+    "KeypointsToImage": KeypointsToImage
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": "(Down)Load LivePortraitModels",
     "LivePortraitProcess": "LivePortraitProcess",
     "LivePortraitCropper": "LivePortraitCropper",
-    "KeypointScaler": "KeypointScaler"
+    "KeypointScaler": "KeypointScaler",
+    "KeypointsToImage": "LivePortrait KeypointsToImage"
     }

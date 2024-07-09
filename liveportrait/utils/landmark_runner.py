@@ -1,6 +1,6 @@
 # coding: utf-8
 
-import cv2; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
+import cv2#; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
 import torch
 import numpy as np
 import onnxruntime

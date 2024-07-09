@@ -1,14 +1,29 @@
 # coding: utf-8
 
 """
-face detectoin and alignment using InsightFace
+face detection and alignment using InsightFace
 """
+from insightface.utils import transform
+
+#patch Insightface function to get rid of the annoying warnings
+def patched_estimate_affine_matrix_3d23d(X, Y):
+    ''' Using least-squares solution 
+    Args:
+        X: [n, 3]. 3d points(fixed)
+        Y: [n, 3]. corresponding 3d points(moving). Y = PX
+    Returns:
+        P_Affine: (3, 4). Affine camera matrix (the third row is [0, 0, 0, 1]).
+    '''
+    X_homo = np.hstack((X, np.ones([X.shape[0],1]))) # n x 4
+    P = np.linalg.lstsq(X_homo, Y, rcond=None)[0].T # Affine matrix. 3 x 4
+    return P
+
+transform.estimate_affine_matrix_3d23d = patched_estimate_affine_matrix_3d23d
 
 import numpy as np
 from insightface.app import FaceAnalysis
 from insightface.app.common import Face
 from .timer import Timer
-
 
 def sort_by_direction(faces, direction: str = 'large-small', face_center=None):
     if len(faces) <= 0:
