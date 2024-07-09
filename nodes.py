@@ -272,6 +272,15 @@ class LivePortraitProcess:
             "lip_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
             "stitching": ("BOOLEAN", {"default": True}),
             "relative": ("BOOLEAN", {"default": True}),
+            "mismatch_method": (
+                    [
+                        "repeat",
+                        "cycle",
+                        "mirror",
+                        "nearest",
+                    ],
+                    {"default": "repeat"},
+                ),
             },
             "optional": {
                 "mask": ("MASK", {"default": None}),
