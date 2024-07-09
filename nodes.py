@@ -7,7 +7,6 @@ import comfy.utils
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
-from .liveportrait.config.argument_config import ArgumentConfig
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
 from .liveportrait.utils.cropper import Cropper
 from .liveportrait.modules.spade_generator import SPADEDecoder
@@ -98,10 +97,11 @@ class DownloadAndLoadLivePortraitModels:
             "optional": {
                  "precision": (
                     [
+                        'auto',
                         'fp16',
                         'fp32',
                     ], {
-                        "default": 'fp16'
+                        "default": 'auto'
                     }),
             }
         }
@@ -111,9 +111,26 @@ class DownloadAndLoadLivePortraitModels:
     FUNCTION = "loadmodel"
     CATEGORY = "LivePortrait"
 
-    def loadmodel(self, precision='fp16'):
+    def loadmodel(self, precision='auto'):
         device = mm.get_torch_device()
         mm.soft_empty_cache()
+
+        if precision == 'auto':
+            try:
+                if mm.is_device_mps(device):
+                    print("LivePortrait using fp32 for MPS")
+                    dtype = 'fp32'
+                elif mm.should_use_fp16():
+                    print("LivePortrait using fp16")
+                    dtype = 'fp16'
+                else:
+                    print("LivePortrait using fp32")
+                    dtype = 'fp32'
+            except:
+                raise AttributeError("ComfyUI version too old, can't autodetect properly. Set your dtypes manually.")
+        else:
+            dtype = precision
+            print(f"LivePortrait using {dtype}")
 
         pbar = comfy.utils.ProgressBar(3)
 
@@ -211,7 +228,7 @@ class DownloadAndLoadLivePortraitModels:
             self.stich_retargeting_module,
             InferenceConfig(
                 device_id=device, 
-                flag_use_half_precision = True if precision == 'fp16' else False
+                flag_use_half_precision = True if dtype == 'fp16' else False
                 )
         )
 

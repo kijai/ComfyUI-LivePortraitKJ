@@ -7,7 +7,7 @@ Pipeline of LivePortrait
 import cv2
 import numpy as np
 import os.path as osp
-from rich.progress import track
+from tqdm import tqdm
 
 from .config.inference_config import InferenceConfig
 
@@ -103,7 +103,7 @@ class LivePortraitPipeline(object):
         I_p_lst = []
         R_d_0, x_d_0_info = None, None
         pbar = comfy.utils.ProgressBar(n_frames)
-        for i in track(range(n_frames), description='Animating...', total=n_frames):
+        for i in tqdm(range(n_frames), desc='Animating...', total=n_frames):
             #if is_video(args.driving_info):
             # extract kp info by M
             I_d_i = I_d_lst[i]
