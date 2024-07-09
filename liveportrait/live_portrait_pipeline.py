@@ -116,7 +116,6 @@ class LivePortraitPipeline(object):
                         )
                     )
 
-            # driving_frame_rgb = cv2.cvtColor(driving_frame, cv2.COLOR_BGR2RGB)
             driving_frame_256 = cv2.resize(driving_frame, (256, 256))
             I_d = self.live_portrait_wrapper.prepare_driving_videos(
                 [driving_frame_256]
