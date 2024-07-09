@@ -232,6 +232,7 @@ class LivePortraitProcess:
                         "constant",
                         "cycle",
                         "mirror",
+                        "cut"
                     ],
                     {"default": "constant"},
                 ),

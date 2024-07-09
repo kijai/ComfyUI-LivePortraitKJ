@@ -62,7 +62,10 @@ class LivePortraitPipeline(object):
         out_mask_list = []
         R_d_0, x_d_0_info = None, None
 
-        total_frames = driving_images_np.shape[0]
+        if mismatch_method == "cut":
+            total_frames = source_np.shape[0]
+        else:
+            total_frames = driving_images_np.shape[0]
 
         pbar = comfy.utils.ProgressBar(total_frames)
 
@@ -73,14 +76,19 @@ class LivePortraitPipeline(object):
                 raise ValueError("Missing driving_landmark_list in crop_info, get it from opt_driving_images in the Cropper node")
 
         for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
-            source_frame_rgb = self._get_source_frame(
-                source_np, i, total_frames, mismatch_method
-            )
+           
             driving_frame = driving_images_np[i]
 
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
             source_lmk = crop_info["crop_info_list"][safe_index]["lmk_crop"]
             img_crop_256x256 = crop_info["crop_info_list"][safe_index]["img_crop_256x256"]
+
+            if mismatch_method == "cut":
+                source_frame_rgb = source_np[safe_index]
+            else:
+                source_frame_rgb = self._get_source_frame(
+                    source_np, i, total_frames, mismatch_method
+                )
 
             if inference_cfg.flag_do_crop:
                 I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
