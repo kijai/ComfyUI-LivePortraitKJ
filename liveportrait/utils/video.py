@@ -10,7 +10,7 @@ import subprocess
 import imageio
 import cv2
 
-from rich.progress import track
+from tqdm import tqdm
 from .helper import prefix
 from .rprint import rprint as print
 
@@ -35,7 +35,7 @@ def images2video(images, wfp, **kwargs):
     )
 
     n = len(images)
-    for i in track(range(n), description='writing', transient=True):
+    for i in tqdm(range(n), description='writing', transient=True):
         if image_mode.lower() == 'bgr':
             writer.append_data(images[i][..., ::-1])
         else:
@@ -83,7 +83,7 @@ def blend(img: np.ndarray, mask: np.ndarray, background_color=(255, 255, 255)):
 def concat_frames(I_p_lst, driving_rgb_lst, img_rgb):
     # TODO: add more concat style, e.g., left-down corner driving
     out_lst = []
-    for idx, _ in track(enumerate(I_p_lst), total=len(I_p_lst), description='Concatenating result...'):
+    for idx, _ in tqdm(enumerate(I_p_lst), total=len(I_p_lst), desc='Concatenating result...'):
         source_image_drived = I_p_lst[idx]
         image_drive = driving_rgb_lst[idx]
 

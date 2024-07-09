@@ -6,7 +6,7 @@ Pipeline of LivePortrait
 
 import cv2
 import comfy.utils
-
+from tqdm import tqdm
 import os.path as osp
 import numpy as np
 from .config.inference_config import InferenceConfig
@@ -77,7 +77,7 @@ class LivePortraitPipeline(object):
         if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
             driving_lmk_lst = self.cropper.get_retargeting_lmk_info(driving_images_np)
 
-        for i in range(total_frames):
+        for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
             source_frame_rgb = self._get_source_frame(
                 source_np, i, total_frames, mismatch_method
             )

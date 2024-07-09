@@ -8,7 +8,7 @@ import os
 import cv2
 import numpy as np
 import pickle
-from rich.progress import track
+from tqdm import tqdm
 from .utils.cropper import Cropper
 
 from .utils.io import load_driving_info
@@ -41,7 +41,7 @@ class TemplateMaker:
         templates = []
 
 
-        for i in track(range(n_frames), description='Making templates...', total=n_frames):
+        for i in tqdm(range(n_frames), desc='Making templates...', total=n_frames):
             I_d_i = I_d_lst[i]
             x_d_i_info = self.live_portrait_wrapper.get_kp_info(I_d_i)
             R_d_i = get_rotation_matrix(x_d_i_info['pitch'], x_d_i_info['yaw'], x_d_i_info['roll'])
