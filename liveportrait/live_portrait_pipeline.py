@@ -72,7 +72,10 @@ class LivePortraitPipeline(object):
         pbar = comfy.utils.ProgressBar(total_frames)
 
         if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-            driving_landmark_list = crop_info["driving_landmark_list"]
+            if 'driving_landmark_list' in crop_info.keys():
+                driving_landmark_list = crop_info["driving_landmark_list"]
+            else:
+                raise ValueError("Missing driving_landmark_list in crop_info, get it from opt_driving_images in the Cropper node")
 
         for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
             source_frame_rgb = self._get_source_frame(
