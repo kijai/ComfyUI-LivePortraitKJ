@@ -116,7 +116,7 @@ class Cropper(object):
         # TODO: implement a tracking-based version
         driving_lmk_lst = []
         for driving_image in driving_rgb_lst:
-            ret_dct = self.crop_single_image(driving_image)
+            ret_dct, _ = self.crop_single_image(driving_image)
             driving_lmk_lst.append(ret_dct['lmk_crop'])
         return driving_lmk_lst
 
