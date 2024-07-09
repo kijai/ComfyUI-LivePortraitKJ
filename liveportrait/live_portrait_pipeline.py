@@ -50,11 +50,6 @@ class LivePortraitPipeline(object):
             if mirror_idx >= source_np.shape[0]:
                 mirror_idx = cycle_length - mirror_idx
             return source_np[mirror_idx]
-        elif method == "nearest":
-            ratio = idx / (total_frames - 1)
-            return source_np[
-                min(int(ratio * (source_np.shape[0] - 1)), source_np.shape[0] - 1)
-            ]
 
     def execute(
         self, source_np, driving_images_np, crop_info, mismatch_method="constant", reference_frame=0
