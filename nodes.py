@@ -292,8 +292,9 @@ class LivePortraitProcess:
         mismatch_method: str = "constant",
         mask: torch.Tensor = None,
     ):
+        if driving_images.shape[0] < source_image.shape[0]:
+            raise ValueError("The number of driving images should be larger than the number of source images.")
         source_np = (source_image * 255).byte().numpy()
-        #driving_images_np = (driving_images * 255).byte().numpy()
         
         pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = eye_retargeting
         pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = (
