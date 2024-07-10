@@ -4,12 +4,11 @@
 Pipeline of LivePortrait
 """
 
-import cv2
 import comfy.utils
 from tqdm import tqdm
 import numpy as np
 from .config.inference_config import InferenceConfig
-
+import torch
 from .utils.camera import get_rotation_matrix
 from .utils.crop import _transform_img
 from .live_portrait_wrapper import LivePortraitWrapper
@@ -52,9 +51,10 @@ class LivePortraitPipeline(object):
             return source_np[mirror_idx]
 
     def execute(
-        self, source_np, driving_images_np, crop_info, mismatch_method="constant", reference_frame=0
+        self, source_np, driving_images, crop_info, mismatch_method="constant", reference_frame=0
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
+        device = inference_cfg.device_id
 
         cropped_image_list = []
         composited_image_list = []
@@ -62,10 +62,10 @@ class LivePortraitPipeline(object):
         out_mask_list = []
         R_d_0, x_d_0_info = None, None
 
-        if mismatch_method == "cut":
+        if mismatch_method == "cut" or inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
             total_frames = source_np.shape[0]
         else:
-            total_frames = driving_images_np.shape[0]
+            total_frames = driving_images.shape[0]
 
         pbar = comfy.utils.ProgressBar(total_frames)
 
@@ -76,19 +76,16 @@ class LivePortraitPipeline(object):
                 raise ValueError("Missing driving_landmark_list in crop_info, get it from opt_driving_images in the Cropper node")
 
         for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
-           
-            driving_frame = driving_images_np[i]
+            x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
 
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
             source_lmk = crop_info["crop_info_list"][safe_index]["lmk_crop"]
             img_crop_256x256 = crop_info["crop_info_list"][safe_index]["img_crop_256x256"]
 
-            if mismatch_method == "cut":
+            if mismatch_method == "cut" or inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
                 source_frame_rgb = source_np[safe_index]
             else:
-                source_frame_rgb = self._get_source_frame(
-                    source_np, i, total_frames, mismatch_method
-                )
+                source_frame_rgb = self._get_source_frame(source_np, i, total_frames, mismatch_method)
 
             if inference_cfg.flag_do_crop:
                 I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
@@ -103,29 +100,17 @@ class LivePortraitPipeline(object):
             f_s = self.live_portrait_wrapper.extract_feature_3d(I_s)
             x_s = self.live_portrait_wrapper.transform_keypoint(x_s_info)
 
+            #lip zero
             if inference_cfg.flag_lip_zero:
                 c_d_lip_before_animation = [0.0]
-                combined_lip_ratio_tensor_before_animation = (
-                    self.live_portrait_wrapper.calc_combined_lip_ratio(
-                        c_d_lip_before_animation, source_lmk
-                    )
-                )
-                if (
-                    combined_lip_ratio_tensor_before_animation[0][0]
-                    < inference_cfg.lip_zero_threshold
-                ):
+                combined_lip_ratio_tensor_before_animation = (self.live_portrait_wrapper.calc_combined_lip_ratio(c_d_lip_before_animation, source_lmk))
+
+                if (combined_lip_ratio_tensor_before_animation[0][0] < inference_cfg.lip_zero_threshold):
                     inference_cfg.flag_lip_zero = False
                 else:
-                    lip_delta_before_animation = (
-                        self.live_portrait_wrapper.retarget_lip(
-                            x_s, combined_lip_ratio_tensor_before_animation
-                        )
-                    )
+                    lip_delta_before_animation = (self.live_portrait_wrapper.retarget_lip(x_s, combined_lip_ratio_tensor_before_animation))
 
-            driving_frame_256 = cv2.resize(driving_frame, (256, 256))
-            I_d = self.live_portrait_wrapper.prepare_driving_videos(
-                [driving_frame_256]
-            )[0]
+            #eye/lip retargeting
 
             if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
                 input_eye_ratio_lst, input_lip_ratio_lst = (
@@ -134,7 +119,7 @@ class LivePortraitPipeline(object):
                     )
                 )
 
-            x_d_info = self.live_portrait_wrapper.get_kp_info(I_d)
+            
             R_d = get_rotation_matrix(
                 x_d_info["pitch"], x_d_info["yaw"], x_d_info["roll"]
             )
@@ -245,36 +230,35 @@ class LivePortraitPipeline(object):
                 if inference_cfg.flag_stitching:
                     x_d_i_new = self.live_portrait_wrapper.stitching(x_s, x_d_i_new)
 
-            out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
-
             if inference_cfg.flag_stitching:
                 x_d_i_new = self.live_portrait_wrapper.stitching(x_s, x_d_i_new)
 
             out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
-            I_p_i = self.live_portrait_wrapper.parse_output(out["out"])[0]
-            cropped_image_list.append(I_p_i)
-
+    
+            cropped_image = torch.clamp(out["out"], 0, 1).permute(0, 2, 3, 1) 
+            cropped_image_list.append(cropped_image)
+        #return cropped_image_list
             # Transform and blend
-            I_p_i_to_ori = _transform_img(
-                I_p_i,
+            if inference_cfg.flag_pasteback:
+                cropped_image_np = self.live_portrait_wrapper.parse_output(out["out"])[0]
+                cropped_image_to_original = _transform_img(
+                cropped_image_np,
                 crop_info["crop_info_list"][safe_index]["M_c2o"],
                 dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
-            )
+                )
 
-            if inference_cfg.flag_pasteback:
-                if inference_cfg.mask_crop is None:
-                    inference_cfg.mask_crop = cv2.imread(os.path.join(script_directory, "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
                 mask_ori = _transform_img(
                     inference_cfg.mask_crop,
                     crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
-                )
+                    )
+                
                 mask_ori = mask_ori.astype(np.float32) / 255.0
-                I_p_i_to_ori_blend = np.clip(
-                    mask_ori * I_p_i_to_ori + (1 - mask_ori) * source_frame_rgb, 0, 255
-                ).astype(np.uint8)
+                cropped_image_to_original_blend = np.clip(
+                    mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame_rgb, 0, 255
+                    ).astype(np.uint8)
 
-            composited_image_list.append(I_p_i_to_ori_blend)
+            composited_image_list.append(cropped_image_to_original_blend)
             out_mask_list.append(mask_ori)
             pbar.update(1)
 

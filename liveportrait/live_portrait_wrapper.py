@@ -32,11 +32,6 @@ class LivePortraitWrapper(object):
         self.device_id = cfg.device_id
         self.timer = Timer()
 
-    def update_config(self, user_args):
-        for k, v in user_args.items():
-            if hasattr(self.cfg, k):
-                setattr(self.cfg, k, v)
-
     def prepare_source(self, img: np.ndarray) -> torch.Tensor:
         """ construct the input as standard
         img: HxWx3, uint8, 256x256
@@ -57,24 +52,6 @@ class LivePortraitWrapper(object):
         x = torch.from_numpy(x).permute(0, 3, 1, 2)  # 1xHxWx3 -> 1x3xHxW
         x = x.to(self.device_id)
         return x
-
-    def prepare_driving_videos(self, imgs) -> torch.Tensor:
-        """ construct the input as standard
-        imgs: NxBxHxWx3, uint8
-        """
-        if isinstance(imgs, list):
-            _imgs = np.array(imgs)[..., np.newaxis]  # TxHxWx3x1
-        elif isinstance(imgs, np.ndarray):
-            _imgs = imgs
-        else:
-            raise ValueError(f'imgs type error: {type(imgs)}')
-
-        y = _imgs.astype(np.float32) / 255.
-        y = np.clip(y, 0, 1)  # clip to 0~1
-        y = torch.from_numpy(y).permute(0, 4, 3, 1, 2)  # TxHxWx3x1 -> Tx1x3xHxW
-        y = y.to(self.device_id)
-
-        return y
 
     def extract_feature_3d(self, x: torch.Tensor) -> torch.Tensor:
         """ get the appearance feature of the image by F

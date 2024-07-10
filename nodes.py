@@ -8,6 +8,8 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 
+
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
@@ -220,7 +222,7 @@ class LivePortraitProcess:
             "source_image": ("IMAGE",),
             "driving_images": ("IMAGE",),
             "lip_zero": ("BOOLEAN", {"default": True}),
-            "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.01, "max": 4.0, "step": 0.001}),
+            "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.001, "max": 4.0, "step": 0.001}),
             "eye_retargeting": ("BOOLEAN", {"default": False}),
             "eyes_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
             "lip_retargeting": ("BOOLEAN", {"default": False}),
@@ -273,7 +275,7 @@ class LivePortraitProcess:
         mask: torch.Tensor = None,
     ):
         source_np = (source_image * 255).byte().numpy()
-        driving_images_np = (driving_images * 255).byte().numpy()
+        #driving_images_np = (driving_images * 255).byte().numpy()
         
         pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = eye_retargeting
         pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = (
@@ -297,29 +299,38 @@ class LivePortraitProcess:
             crop_mask = np.repeat(np.atleast_3d(crop_mask), 3, axis=2)
             pipeline.live_portrait_wrapper.cfg.mask_crop = crop_mask
         else:
-            crop_mask = None
-            pipeline.live_portrait_wrapper.cfg.mask_crop = None
+            log.info("Using default mask template")
+            pipeline.live_portrait_wrapper.cfg.mask_crop = cv2.imread(os.path.join(script_directory, "liveportrait", "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
+
+        driving_images_256 = comfy.utils.common_upscale(driving_images.permute(0, 3, 1, 2), 256, 256, "lanczos", "disabled")
+        if pipeline.live_portrait_wrapper.cfg.flag_use_half_precision:
+            driving_images_256 = driving_images_256.to(torch.float16)
 
         cropped_out_list = []
         full_out_list = []
 
         cropped_out_list, full_out_list, out_mask_list = pipeline.execute(
-            source_np, driving_images_np, crop_info, mismatch_method
+            source_np, 
+            driving_images_256, 
+            crop_info, 
+            mismatch_method
         )
-        cropped_tensors_out = (
-            torch.stack([torch.from_numpy(np_array) for np_array in cropped_out_list])
-            / 255
-        )
+      
+        cropped_out_tensors = torch.cat(cropped_out_list, dim=0)
+        cropped_out_tensors = cropped_out_tensors
+        
         full_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in full_out_list])
             / 255
         )
+        
         mask_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in out_mask_list])
         )[:, :, :, 0]
-
+        
+        
         return (
-            cropped_tensors_out.cpu().float(), 
+            cropped_out_tensors.cpu().float(), 
             full_tensors_out.cpu().float(), 
             mask_tensors_out.cpu().float()
             )
@@ -333,8 +344,8 @@ class LivePortraitCropper:
             "source_image": ("IMAGE",),
             "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
             "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01}),
-            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.01}),
-            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.01}),
+            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.001}),
+            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.001}),
             "face_index": ("INT", {"default": 0, "min": 0, "max": 100}),
             "rotate": ("BOOLEAN", {"default": True}),
             "onnx_device": (
