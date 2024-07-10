@@ -69,8 +69,9 @@ class DownloadAndLoadLivePortraitModels:
                     [
                         "fp16",
                         "fp32",
+                        "auto",
                     ],
-                    {"default": "fp16"},
+                    {"default": "auto"},
                 ),
             },
         }
@@ -83,6 +84,23 @@ class DownloadAndLoadLivePortraitModels:
     def loadmodel(self, precision="fp16"):
         device = mm.get_torch_device()
         mm.soft_empty_cache()
+
+        if precision == 'auto':
+            try:
+                if mm.is_device_mps(device):
+                    print("LivePortrait using fp32 for MPS")
+                    dtype = 'fp32'
+                elif mm.should_use_fp16():
+                    print("LivePortrait using fp16")
+                    dtype = 'fp16'
+                else:
+                    print("LivePortrait using fp32")
+                    dtype = 'fp32'
+            except:
+                raise AttributeError("ComfyUI version too old, can't autodetect properly. Set your dtypes manually.")
+        else:
+            dtype = precision
+            print(f"LivePortrait using {dtype}")
 
         pbar = comfy.utils.ProgressBar(3)
 
