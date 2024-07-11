@@ -50,9 +50,10 @@ class DenseMotionNetwork(nn.Module):
         try:
             sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False)        
         except NotImplementedError:
+            out_device = feature_repeat.device # Store input device
             feature_repeat = feature_repeat.to('cpu')
             sparse_motions = sparse_motions.to('cpu')
-            sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False).to('mps')
+            sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False).to(out_device)
         sparse_deformed = sparse_deformed.view((bs, self.num_kp+1, -1, d, h, w))                        # (bs, num_kp+1, c, d, h, w)
 
         return sparse_deformed
@@ -66,7 +67,7 @@ class DenseMotionNetwork(nn.Module):
         # adding background feature
         try:
             zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1], spatial_size[2]).type(heatmap.type()).to(heatmap.device)
-        except:
+        except ValueError:
             zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1], spatial_size[2]).to(heatmap.device)
         heatmap = torch.cat([zeros, heatmap], dim=1)
         heatmap = heatmap.unsqueeze(2)         # (bs, 1+num_kp, 1, d, h, w)

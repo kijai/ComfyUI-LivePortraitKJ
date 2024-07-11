@@ -47,7 +47,8 @@ class WarpingNetwork(nn.Module):
         try:
             return F.grid_sample(inp, deformation, align_corners=False)
         except NotImplementedError:
-            return F.grid_sample(inp.to('cpu'), deformation.to('cpu'), align_corners=False).to('mps')
+            out_device = inp.device # Store input device
+            return F.grid_sample(inp.to('cpu'), deformation.to('cpu'), align_corners=False).to(out_device)
 
     def forward(self, feature_3d, kp_driving, kp_source):
         if self.dense_motion_network is not None:

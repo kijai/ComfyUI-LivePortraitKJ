@@ -161,7 +161,8 @@ class DownBlock3d(nn.Module):
         try:
             out = self.pool(out)
         except NotImplementedError:
-            out = self.pool(out.to('cpu')).to('mps')
+            out_device = out.device # Store input device
+            out = self.pool(out.to('cpu')).to(out_device)
         return out
 
 
