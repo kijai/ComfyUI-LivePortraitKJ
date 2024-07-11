@@ -46,9 +46,9 @@ class DenseMotionNetwork(nn.Module):
         bs, _, d, h, w = feature.shape
         feature_repeat = feature.unsqueeze(1).unsqueeze(1).repeat(1, self.num_kp+1, 1, 1, 1, 1, 1)      # (bs, num_kp+1, 1, c, d, h, w)
         feature_repeat = feature_repeat.view(bs * (self.num_kp+1), -1, d, h, w)                         # (bs*(num_kp+1), c, d, h, w)
-        sparse_motions = sparse_motions.view((bs * (self.num_kp+1), d, h, w, -1))
+        sparse_motions = sparse_motions.view((bs * (self.num_kp+1), d, h, w, -1))                       # (bs*(num_kp+1), d, h, w, 3)
         try:
-            sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False)        # (bs*(num_kp+1), d, h, w, 3)
+            sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False)        
         except NotImplementedError:
             feature_repeat = feature_repeat.to('cpu')
             sparse_motions = sparse_motions.to('cpu')
