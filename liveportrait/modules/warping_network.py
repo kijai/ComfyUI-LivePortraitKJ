@@ -44,7 +44,10 @@ class WarpingNetwork(nn.Module):
         self.estimate_occlusion_map = estimate_occlusion_map
 
     def deform_input(self, inp, deformation):
-        return F.grid_sample(inp, deformation, align_corners=False)
+        try:
+            return F.grid_sample(inp, deformation, align_corners=False)
+        except NotImplementedError:
+            return F.grid_sample(inp.to('cpu'), deformation.to('cpu'), align_corners=False).to('mps')
 
     def forward(self, feature_3d, kp_driving, kp_source):
         if self.dense_motion_network is not None:
