@@ -42,8 +42,8 @@ class Cropper(object):
         self.face_analysis_wrapper.prepare(ctx_id=device_id, det_size=(512, 512))
         self.face_analysis_wrapper.warmup()
 
-    def crop_single_image(self, img_rgb, dsize, scale, vy_ratio, vx_ratio, face_index, rotate):
-        direction = 'large-small'
+    def crop_single_image(self, img_rgb, dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate):
+        direction = face_index_order
 
         src_face = self.face_analysis_wrapper.get(
             img_rgb,
@@ -52,7 +52,9 @@ class Cropper(object):
         )
 
         if len(src_face) == 0:
-            raise Exception("No face detected in the source image!")
+            ret_dct = {}
+            return ret_dct
+            #raise Exception("No face detected in the source image!")
         #elif len(src_face) > 1:
         #    print(f'More than one face detected in the image, only pick one face by rule {direction}.')
 

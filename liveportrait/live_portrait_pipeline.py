@@ -12,6 +12,7 @@ import torch
 from .utils.camera import get_rotation_matrix
 from .utils.crop import _transform_img
 from .live_portrait_wrapper import LivePortraitWrapper
+from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 
 import os
 script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -35,7 +36,7 @@ class LivePortraitPipeline(object):
             cfg=inference_cfg,
         )
 
-    def _get_source_frame(self, source_np, idx, total_frames, method):
+    def _get_source_frame(self, source_np, idx, method):
         if source_np.shape[0] == 1:
             return source_np[0]
 
@@ -51,14 +52,13 @@ class LivePortraitPipeline(object):
             return source_np[mirror_idx]
 
     def execute(
-        self, source_np, driving_images, crop_info, mismatch_method="constant", reference_frame=0
+        self, source_np, driving_images, crop_info, driving_landmarks, delta_multiplier = 1.0, mismatch_method="constant"
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
         device = inference_cfg.device_id
 
         cropped_image_list = []
         composited_image_list = []
-        driving_landmark_list = []
         out_mask_list = []
         R_d_0, x_d_0_info = None, None
 
@@ -69,23 +69,26 @@ class LivePortraitPipeline(object):
 
         pbar = comfy.utils.ProgressBar(total_frames)
 
-        if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-            if 'driving_landmark_list' in crop_info.keys():
-                driving_landmark_list = crop_info["driving_landmark_list"]
-            else:
-                raise ValueError("Missing driving_landmark_list in crop_info, get it from opt_driving_images in the Cropper node")
-
         for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
-            x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
 
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
+
+            # skip and return empty frames if no crop due to no face detected
+            if not crop_info["crop_info_list"][safe_index]:
+                composited_image_list.append(source_np[safe_index])
+                cropped_image_list.append(torch.zeros(1, 512, 512, 3, dtype=torch.float32, device = device))
+                out_mask_list.append(np.zeros((source_np.shape[1], source_np.shape[2], 3), dtype=np.uint8))
+                continue
+
             source_lmk = crop_info["crop_info_list"][safe_index]["lmk_crop"]
             img_crop_256x256 = crop_info["crop_info_list"][safe_index]["img_crop_256x256"]
+
+            x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
 
             if mismatch_method == "cut" or inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
                 source_frame_rgb = source_np[safe_index]
             else:
-                source_frame_rgb = self._get_source_frame(source_np, i, total_frames, mismatch_method)
+                source_frame_rgb = self._get_source_frame(source_np, i, mismatch_method)
 
             if inference_cfg.flag_do_crop:
                 I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
@@ -110,16 +113,6 @@ class LivePortraitPipeline(object):
                 else:
                     lip_delta_before_animation = (self.live_portrait_wrapper.retarget_lip(x_s, combined_lip_ratio_tensor_before_animation))
 
-            #eye/lip retargeting
-
-            if inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-                input_eye_ratio_lst, input_lip_ratio_lst = (
-                    self.live_portrait_wrapper.calc_retargeting_ratio(
-                        source_lmk, driving_landmark_list
-                    )
-                )
-
-            
             R_d = get_rotation_matrix(
                 x_d_info["pitch"], x_d_info["yaw"], x_d_info["roll"]
             )
@@ -142,6 +135,9 @@ class LivePortraitPipeline(object):
                 t_new = x_d_info["t"]
 
             t_new[..., 2].fill_(0)  # zero tz
+
+            delta_new = delta_new * delta_multiplier
+            
             x_d_i_new = scale_new * (x_c_s @ R_new + delta_new) + t_new
             if (
                 not inference_cfg.flag_stitching
@@ -168,7 +164,7 @@ class LivePortraitPipeline(object):
             else:
                 eyes_delta, lip_delta = None, None
                 if inference_cfg.flag_eye_retargeting:
-                    c_d_eyes_i = input_eye_ratio_lst[i]
+                    c_d_eyes_i = calc_eye_close_ratio(driving_landmarks[i][None])
                     combined_eye_ratio_tensor = (
                         self.live_portrait_wrapper.calc_combined_eye_ratio(
                             c_d_eyes_i, source_lmk
@@ -183,7 +179,7 @@ class LivePortraitPipeline(object):
                         x_s, combined_eye_ratio_tensor
                     )
                 if inference_cfg.flag_lip_retargeting:
-                    c_d_lip_i = input_lip_ratio_lst[i]
+                    c_d_lip_i = calc_lip_close_ratio(driving_landmarks[i][None])
                     combined_lip_ratio_tensor = (
                         self.live_portrait_wrapper.calc_combined_lip_ratio(
                             c_d_lip_i, source_lmk
@@ -235,7 +231,7 @@ class LivePortraitPipeline(object):
 
             out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
     
-            cropped_image = torch.clamp(out["out"], 0, 1).permute(0, 2, 3, 1) 
+            cropped_image = torch.clamp(out["out"], 0, 1).permute(0, 2, 3, 1)
             cropped_image_list.append(cropped_image)
         #return cropped_image_list
             # Transform and blend

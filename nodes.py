@@ -8,8 +8,6 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 
-
-
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
@@ -236,17 +234,14 @@ class LivePortraitProcess:
         return {"required": {
 
             "pipeline": ("LIVEPORTRAITPIPE",),
-            "crop_info": ("CROPINFO", {"default": []}),
+            "crop_info": ("CROPINFO", {"default": {}}),
             "source_image": ("IMAGE",),
             "driving_images": ("IMAGE",),
             "lip_zero": ("BOOLEAN", {"default": True}),
             "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.001, "max": 4.0, "step": 0.001}),
-            "eye_retargeting": ("BOOLEAN", {"default": False}),
-            "eyes_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
-            "lip_retargeting": ("BOOLEAN", {"default": False}),
-            "lip_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
             "stitching": ("BOOLEAN", {"default": True}),
             "relative": ("BOOLEAN", {"default": True}),
+            "delta_multiplier": ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.001}),
             "mismatch_method": (
                     [
                         "constant",
@@ -259,6 +254,7 @@ class LivePortraitProcess:
             },
             "optional": {
                 "mask": ("MASK", {"default": None}),
+                "opt_retargeting_info": ("RETARGETINGINFO", {"default": None}),
             }
         }
 
@@ -279,37 +275,40 @@ class LivePortraitProcess:
         self,
         source_image: torch.Tensor,
         driving_images: torch.Tensor,
-        crop_info: list,
+        crop_info: dict,
         pipeline: LivePortraitPipeline,
         lip_zero: bool,
         lip_zero_threshold: float,
-        eye_retargeting: bool,
-        lip_retargeting: bool,
         stitching: bool,
         relative: bool,
-        eyes_retargeting_multiplier: float,
-        lip_retargeting_multiplier: float,
+        delta_multiplier: float = 1.0,
         mismatch_method: str = "constant",
         mask: torch.Tensor = None,
+        opt_retargeting_info: dict = None,
     ):
         if driving_images.shape[0] < source_image.shape[0]:
             raise ValueError("The number of driving images should be larger than the number of source images.")
         source_np = (source_image * 255).byte().numpy()
         
-        pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = eye_retargeting
-        pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = (
-            eyes_retargeting_multiplier
-        )
-        pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = lip_retargeting
-        pipeline.live_portrait_wrapper.cfg.lip_retargeting_multiplier = (
-            lip_retargeting_multiplier
-        )
+        if opt_retargeting_info is not None:
+            pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = opt_retargeting_info["eye_retargeting"]
+            pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = (opt_retargeting_info["eyes_retargeting_multiplier"])
+            pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = opt_retargeting_info["lip_retargeting"]
+            pipeline.live_portrait_wrapper.cfg.lip_retargeting_multiplier = (opt_retargeting_info["lip_retargeting_multiplier"])
+            driving_landmarks = opt_retargeting_info["driving_landmarks"]
+        else:
+            pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = False
+            pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = 1.0
+            pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = False
+            pipeline.live_portrait_wrapper.cfg.lip_retargeting_multiplier = 1.0
+            driving_landmarks = None
+
         pipeline.live_portrait_wrapper.cfg.flag_stitching = stitching
         pipeline.live_portrait_wrapper.cfg.flag_relative = relative
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
         pipeline.live_portrait_wrapper.cfg.lip_zero_threshold = lip_zero_threshold
 
-        if lip_zero and (lip_retargeting or eye_retargeting):
+        if lip_zero and opt_retargeting_info is not None:
             log.warning("Warning: lip_zero only has an effect with lip or eye retargeting")
 
         if mask is not None:
@@ -332,6 +331,8 @@ class LivePortraitProcess:
             source_np, 
             driving_images_256, 
             crop_info, 
+            driving_landmarks,
+            delta_multiplier,
             mismatch_method
         )
       
@@ -347,46 +348,31 @@ class LivePortraitProcess:
             torch.stack([torch.from_numpy(np_array) for np_array in out_mask_list])
         )[:, :, :, 0]
         
-        
         return (
             cropped_out_tensors.cpu().float(), 
             full_tensors_out.cpu().float(), 
             mask_tensors_out.cpu().float()
             )
 
-
-class LivePortraitCropper:
+class LivePortraitLoadCropper:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
 
-            "source_image": ("IMAGE",),
-            "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
-            "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01}),
-            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.001}),
-            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.001}),
-            "face_index": ("INT", {"default": 0, "min": 0, "max": 100}),
-            "rotate": ("BOOLEAN", {"default": True}),
             "onnx_device": (
-                    ['CPU', 'CUDA', 'ROCM'], {
+                    ['CPU', 'CUDA', 'ROCM', 'CoreML'], {
                         "default": 'CPU'
                     }),
             "keep_model_loaded": ("BOOLEAN", {"default": True})
-            },
-            "optional": {
-                "opt_driving_images": ("IMAGE",),
-            }
-           
+            },           
         }
 
-    RETURN_TYPES = ("IMAGE", "CROPINFO",)
-    RETURN_NAMES = ("cropped_image", "crop_info",)
-    FUNCTION = "process"
+    RETURN_TYPES = ("LPCROPPER",)
+    RETURN_NAMES = ("cropper",)
+    FUNCTION = "crop"
     CATEGORY = "LivePortrait"
 
-    def process(self, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, rotate, keep_model_loaded, onnx_device='CUDA', opt_driving_images=None):
-        source_image_np = (source_image * 255).byte().numpy()
-
+    def crop(self, onnx_device, keep_model_loaded):
         cropper_init_config = {
             'keep_model_loaded': keep_model_loaded,
             'onnx_device': onnx_device
@@ -396,30 +382,56 @@ class LivePortraitCropper:
             self.current_config = cropper_init_config
             self.cropper = Cropper(**cropper_init_config)
 
+        return (self.cropper,)
+    
+class LivePortraitCropper:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "cropper": ("LPCROPPER",),
+            "source_image": ("IMAGE",),
+            "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
+            "scale": ("FLOAT", {"default": 2.3, "min": 1.0, "max": 4.0, "step": 0.01}),
+            "vx_ratio": ("FLOAT", {"default": 0.0, "min": -1.0, "max": 1.0, "step": 0.001}),
+            "vy_ratio": ("FLOAT", {"default": -0.125, "min": -1.0, "max": 1.0, "step": 0.001}),
+            "face_index": ("INT", {"default": 0, "min": 0, "max": 100}),
+            "face_index_order": (
+                    [
+                        'large-small', 
+                        'left-right', 
+                        'right-left',
+                        'top-bottom',
+                        'bottom-top',
+                        'small-large',
+                        'distance-from-retarget-face'
+                     ],
+                    ),
+            "rotate": ("BOOLEAN", {"default": True}),
+            },           
+        }
+
+    RETURN_TYPES = ("IMAGE", "CROPINFO",)
+    RETURN_NAMES = ("cropped_image", "crop_info",)
+    FUNCTION = "process"
+    CATEGORY = "LivePortrait"
+
+    def process(self, cropper, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, face_index_order, rotate):
+        source_image_np = (source_image * 255).byte().numpy()
+
         crop_info_list = []
         cropped_images_list = []
-
-        if opt_driving_images is not None:
-            driving_images_np = (opt_driving_images * 255).byte().numpy()
-            driving_landmark_list = []
        
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
-            crop_info = self.cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, rotate)
+            crop_info = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
             crop_info_list.append(crop_info)
-            cropped_image = crop_info['img_crop_256x256']
+            if crop_info:
+                cropped_image = crop_info['img_crop_256x256']
+            else:
+                cropped_image = np.zeros((256, 256, 3), dtype=np.uint8)
             cropped_images_list.append(cropped_image)
-
-            if opt_driving_images is not None:
-                driving_crop_dict = self.cropper.crop_single_image(driving_images_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, rotate)
-                driving_landmark_list.append(driving_crop_dict['lmk_crop'])
               
             pbar.update(1)
-        
-        if not keep_model_loaded:
-            self.cropper = None
-            mm.soft_empty_cache()
-
         
         cropped_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in cropped_images_list])
@@ -430,10 +442,40 @@ class LivePortraitCropper:
             'crop_info_list': crop_info_list
         }
 
-        if opt_driving_images is not None:
-            crop_info_dict['driving_landmark_list'] = driving_landmark_list
-
         return (cropped_tensors_out, crop_info_dict)
+
+class LivePortraitRetargeting:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "driving_crop_info": ("CROPINFO", {"default": []}),
+            "eye_retargeting": ("BOOLEAN", {"default": False}),
+            "eyes_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
+            "lip_retargeting": ("BOOLEAN", {"default": False}),
+            "lip_retargeting_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 10.0, "step": 0.001}),
+            },
+        }
+
+    RETURN_TYPES = ("RETARGETINGINFO",)
+    RETURN_NAMES = ("retargeting_info",)
+    FUNCTION = "process"
+    CATEGORY = "LivePortrait"
+
+    def process(self, driving_crop_info, eye_retargeting, eyes_retargeting_multiplier, lip_retargeting, lip_retargeting_multiplier):
+
+        driving_landmarks = []
+        for crop in driving_crop_info["crop_info_list"]:
+            driving_landmarks.append(crop['lmk_crop'])
+                          
+        retargeting_info = {
+            'eye_retargeting': eye_retargeting,
+            'eyes_retargeting_multiplier': eyes_retargeting_multiplier,
+            'lip_retargeting': lip_retargeting,
+            'lip_retargeting_multiplier': lip_retargeting_multiplier,
+            'driving_landmarks': driving_landmarks
+        }
+
+        return (retargeting_info,)
 
 
 class KeypointsToImage:
@@ -454,15 +496,18 @@ class KeypointsToImage:
         keypoints_img_list = []
         pbar = comfy.utils.ProgressBar(len(crop_info))
         for crop in crop_info["crop_info_list"]:
-            keypoints = crop['lmk_crop'].copy()
-            # Draw each landmark as a circle
-            blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
-            for (x, y) in keypoints:
-                # Ensure the coordinates are within the dimensions of the blank image
-                if 0 <= x < width and 0 <= y < height:
-                    cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
+            if crop:
+                keypoints = crop['lmk_crop'].copy()
+                # Draw each landmark as a circle
+                blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
+                for (x, y) in keypoints:
+                    # Ensure the coordinates are within the dimensions of the blank image
+                    if 0 <= x < width and 0 <= y < height:
+                        cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
 
-            keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
+                keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
+            else:
+                keypoints_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
             keypoints_img_list.append(keypoints_image)
             pbar.update(1)
 
@@ -526,13 +571,17 @@ NODE_CLASS_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": DownloadAndLoadLivePortraitModels,
     "LivePortraitProcess": LivePortraitProcess,
     "LivePortraitCropper": LivePortraitCropper,
-    "KeypointScaler": KeypointScaler,
-    "KeypointsToImage": KeypointsToImage
+    "LivePortraitRetargeting": LivePortraitRetargeting,
+    #"KeypointScaler": KeypointScaler,
+    "KeypointsToImage": KeypointsToImage,
+    "LivePortraitLoadCropper": LivePortraitLoadCropper
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": "(Down)Load LivePortraitModels",
     "LivePortraitProcess": "LivePortraitProcess",
     "LivePortraitCropper": "LivePortraitCropper",
-    "KeypointScaler": "KeypointScaler",
-    "KeypointsToImage": "LivePortrait KeypointsToImage"
+    "LivePortraitRetargeting": "LivePortraitRetargeting",
+    #"KeypointScaler": "KeypointScaler",
+    "KeypointsToImage": "LivePortrait KeypointsToImage",
+    "LivePortraitLoadCropper": "LivePortrait LoadCropper"
     }
