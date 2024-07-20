@@ -10,7 +10,7 @@ import numpy as np
 from .config.inference_config import InferenceConfig
 import torch
 from .utils.camera import get_rotation_matrix
-from .utils.crop import _transform_img
+from .utils.crop import _transform_img, _transform_img_kornia
 from .live_portrait_wrapper import LivePortraitWrapper
 from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 
@@ -124,9 +124,7 @@ class LivePortraitPipeline(object):
             if inference_cfg.flag_relative:
                 R_new = (R_d @ R_d_0.permute(0, 2, 1)) @ R_s
                 delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_d_0_info["exp"])
-                scale_new = x_s_info["scale"] * (
-                    x_d_info["scale"] / x_d_0_info["scale"]
-                )
+                scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_d_0_info["scale"])
                 t_new = x_s_info["t"] + (x_d_info["t"] - x_d_0_info["t"])
             else:
                 R_new = R_d
@@ -232,27 +230,40 @@ class LivePortraitPipeline(object):
             out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
     
             cropped_image = torch.clamp(out["out"], 0, 1).permute(0, 2, 3, 1)
+           
             cropped_image_list.append(cropped_image)
         #return cropped_image_list
             # Transform and blend
             if inference_cfg.flag_pasteback:
-                cropped_image_np = self.live_portrait_wrapper.parse_output(out["out"])[0]
-                cropped_image_to_original = _transform_img(
-                cropped_image_np,
+                # cropped_image_np = self.live_portrait_wrapper.parse_output(out["out"])[0]
+                # cropped_image_to_original = _transform_img(
+                # cropped_image_np,
+                # crop_info["crop_info_list"][safe_index]["M_c2o"],
+                # dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
+                # )
+                
+                cropped_image_to_original = _transform_img_kornia(
+                cropped_image,
                 crop_info["crop_info_list"][safe_index]["M_c2o"],
                 dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
                 )
 
-                mask_ori = _transform_img(
+                mask_ori = _transform_img_kornia(
                     inference_cfg.mask_crop,
                     crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
                     )
                 
-                mask_ori = mask_ori.astype(np.float32) / 255.0
-                cropped_image_to_original_blend = np.clip(
-                    mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame_rgb, 0, 255
-                    ).astype(np.uint8)
+                #mask_ori = mask_ori.astype(np.float32) / 255.0
+                # cropped_image_to_original_blend = np.clip(
+                #     mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame_rgb, 0, 255
+                #     ).astype(np.uint8)
+
+                source_frame_torch = torch.from_numpy(source_frame_rgb).unsqueeze(0).permute(0, 3, 1, 2).to(mask_ori.device) / 255
+
+                cropped_image_to_original_blend = torch.clip(
+                     mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame_torch, 0, 1
+                     )
 
             composited_image_list.append(cropped_image_to_original_blend)
             out_mask_list.append(mask_ori)

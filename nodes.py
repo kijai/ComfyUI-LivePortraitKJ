@@ -312,9 +312,11 @@ class LivePortraitProcess:
             log.warning("Warning: lip_zero only has an effect with lip or eye retargeting")
 
         if mask is not None:
-            crop_mask = mask[0].cpu().numpy()
-            crop_mask = (crop_mask * 255).astype(np.uint8)
-            crop_mask = np.repeat(np.atleast_3d(crop_mask), 3, axis=2)
+            # crop_mask = mask[0].cpu().numpy()
+            # crop_mask = (crop_mask * 255).astype(np.uint8)
+            # crop_mask = np.repeat(np.atleast_3d(crop_mask), 3, axis=2)
+            crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
+
             pipeline.live_portrait_wrapper.cfg.mask_crop = crop_mask
         else:
             log.info("Using default mask template")
@@ -337,16 +339,21 @@ class LivePortraitProcess:
         )
       
         cropped_out_tensors = torch.cat(cropped_out_list, dim=0)
-        cropped_out_tensors = cropped_out_tensors
+
+        full_tensors_out = torch.cat(full_out_list, dim=0)
+        full_tensors_out = full_tensors_out.permute(0, 2, 3, 1)
+
+        mask_tensors_out = torch.cat(out_mask_list, dim=0)
+        mask_tensors_out = mask_tensors_out[:, :, :, 0]
         
-        full_tensors_out = (
-            torch.stack([torch.from_numpy(np_array) for np_array in full_out_list])
-            / 255
-        )
+        # full_tensors_out = (
+        #     torch.stack([torch.from_numpy(np_array) for np_array in full_out_list])
+        #     / 255
+        # )
         
-        mask_tensors_out = (
-            torch.stack([torch.from_numpy(np_array) for np_array in out_mask_list])
-        )[:, :, :, 0]
+        # mask_tensors_out = (
+        #     torch.stack([torch.from_numpy(np_array) for np_array in out_mask_list])
+        # )[:, :, :, 0]
         
         return (
             cropped_out_tensors.cpu().float(), 

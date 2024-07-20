@@ -9,7 +9,7 @@ import numpy as np
 from math import sin, cos, acos, degrees
 DTYPE = np.float32
 CV2_INTERP = cv2.INTER_LINEAR
-
+import comfy.model_management as mm
 
 def _transform_img(img, M, dsize, flags=CV2_INTERP, borderMode=None):
     """ conduct similarity or affine transformation to the image, do not do border operation!
@@ -27,6 +27,43 @@ def _transform_img(img, M, dsize, flags=CV2_INTERP, borderMode=None):
     else:
         return cv2.warpAffine(img, M[:2, :], dsize=_dsize, flags=flags)
 
+import torch
+import kornia.geometry.transform as KGT
+
+def _transform_img_kornia(img, M, dsize, flags='bilinear', borderMode='zeros'):
+    """Conduct similarity or affine transformation to the image using Kornia.
+    
+    img: Input image as a PyTorch tensor of shape (C, H, W).
+    M: 2x3 transformation matrix as a PyTorch tensor.
+    dsize: Target shape (width, height).
+    """
+    device = mm.get_torch_device()
+    # Convert dsize to tensor shape (H, W)
+    _dsize = torch.tensor([dsize[1], dsize[0]])  # Kornia expects (H, W)
+
+    # Convert M from numpy.ndarray to PyTorch tensor
+    M = torch.from_numpy(M).float().to(device)
+    if M.shape == (3, 3):
+        M = M[:2, :].unsqueeze(0)  # Adjust M to the expected shape Bx2x3
+    elif M.shape == (2, 3):
+        M = M.unsqueeze(0)  # Add batch dimension if not present
+
+    # Reshape M for Kornia (1, 2, 3) and upscale to 3D affine matrix if not already
+    if M.shape == (2, 3):
+        M = M.unsqueeze(0)  # Add batch dimension
+
+    # Convert image to floating point tensor if not already
+    if img.dtype != torch.float32:
+        img = img.float()
+    img = img.to(device)
+
+    # Reshape img for Kornia (B, C, H, W)
+    img = img.permute(0, 3, 1, 2)
+
+    # Apply the affine transformation
+    img_warped = KGT.warp_affine(img, M, _dsize, mode=flags, padding_mode=borderMode)
+
+    return img_warped
 
 def _transform_pts(pts, M):
     """ conduct similarity or affine transformation to the pts
