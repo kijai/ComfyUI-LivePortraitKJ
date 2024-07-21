@@ -63,7 +63,7 @@ class LivePortraitPipeline(object):
         out_mask_list = []
         R_d_0, x_d_0_info = None, None
 
-        if mismatch_method == "cut":
+        if mismatch_method == "cut" or relative_motion_mode == "source_video_smoothed":
             total_frames = source_np.shape[0]
         else:
             total_frames = driving_images.shape[0]
