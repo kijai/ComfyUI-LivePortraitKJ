@@ -127,7 +127,7 @@ class LivePortraitPipeline(object):
                 scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_d_0_info["scale"])
                 t_new = x_s_info["t"] + (x_d_info["t"] - x_d_0_info["t"])
             else:
-                R_new = R_d
+                R_new = R_s if inference_cfg.flag_relative_rotation_only else R_d
                 delta_new = x_d_info["exp"]
                 scale_new = x_s_info["scale"]
                 t_new = x_d_info["t"]
@@ -232,7 +232,7 @@ class LivePortraitPipeline(object):
             cropped_image = torch.clamp(out["out"], 0, 1).permute(0, 2, 3, 1)
            
             cropped_image_list.append(cropped_image)
-        #return cropped_image_list
+        
             # Transform and blend
             if inference_cfg.flag_pasteback:
                 # cropped_image_np = self.live_portrait_wrapper.parse_output(out["out"])[0]

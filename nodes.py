@@ -37,6 +37,7 @@ class InferenceConfig:
         flag_lip_retargeting=False,
         flag_stitching=True,
         flag_relative=True,
+        flag_relative_rotation_only=False,
         input_shape=(256, 256),
         flag_pasteback=True,
         device_id=0,
@@ -50,6 +51,7 @@ class InferenceConfig:
         self.flag_lip_retargeting = flag_lip_retargeting
         self.flag_stitching = flag_stitching
         self.flag_relative = flag_relative
+        self.flag_relative_rotation_only = flag_relative_rotation_only
         self.input_shape = input_shape
         self.flag_pasteback = flag_pasteback
         self.device_id = device_id
@@ -241,6 +243,7 @@ class LivePortraitProcess:
             "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.001, "max": 4.0, "step": 0.001}),
             "stitching": ("BOOLEAN", {"default": True}),
             "relative": ("BOOLEAN", {"default": True}),
+            "flag_relative_rotation_only": ("BOOLEAN", {"default": True}),
             "delta_multiplier": ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.001}),
             "mismatch_method": (
                     [
@@ -281,6 +284,7 @@ class LivePortraitProcess:
         lip_zero_threshold: float,
         stitching: bool,
         relative: bool,
+        flag_relative_rotation_only: bool,
         delta_multiplier: float = 1.0,
         mismatch_method: str = "constant",
         mask: torch.Tensor = None,
@@ -305,6 +309,7 @@ class LivePortraitProcess:
 
         pipeline.live_portrait_wrapper.cfg.flag_stitching = stitching
         pipeline.live_portrait_wrapper.cfg.flag_relative = relative
+        pipeline.live_portrait_wrapper.cfg.flag_relative_rotation_only = flag_relative_rotation_only
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
         pipeline.live_portrait_wrapper.cfg.lip_zero_threshold = lip_zero_threshold
 
