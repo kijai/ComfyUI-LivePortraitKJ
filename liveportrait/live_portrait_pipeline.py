@@ -125,6 +125,7 @@ class LivePortraitPipeline(object):
             x_s_info = source_info[safe_index]
 
             R_s = source_rot_list[safe_index]
+            R_d = driving_rot_list[i]
             f_s = f_s_list[safe_index]
             x_s = x_s_list[safe_index]
 
@@ -140,13 +141,10 @@ class LivePortraitPipeline(object):
                 else:
                     lip_delta_before_animation = (self.live_portrait_wrapper.retarget_lip(x_s, combined_lip_ratio_tensor_before_animation))
 
-            R_d = driving_rot_list[i]
-
-            if i == 0:
-                R_d_0 = R_d
-                x_d_0_info = x_d_info
-
             if relative_motion_mode == "relative":
+                if i == 0:
+                    R_d_0 = R_d
+                    x_d_0_info = x_d_info
                 R_new = (R_d @ R_d_0.permute(0, 2, 1)) @ R_s
                 delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_d_0_info["exp"])
                 scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_d_0_info["scale"])

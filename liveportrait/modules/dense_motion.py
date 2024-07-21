@@ -47,7 +47,13 @@ class DenseMotionNetwork(nn.Module):
         feature_repeat = feature.unsqueeze(1).unsqueeze(1).repeat(1, self.num_kp+1, 1, 1, 1, 1, 1)      # (bs, num_kp+1, 1, c, d, h, w)
         feature_repeat = feature_repeat.view(bs * (self.num_kp+1), -1, d, h, w)                         # (bs*(num_kp+1), c, d, h, w)
         sparse_motions = sparse_motions.view((bs * (self.num_kp+1), d, h, w, -1))                       # (bs*(num_kp+1), d, h, w, 3)
-        sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False)
+        try:
+            sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False)        
+        except NotImplementedError: #MPS fallback
+            out_device = feature_repeat.device # Store input device
+            feature_repeat = feature_repeat.to('cpu')
+            sparse_motions = sparse_motions.to('cpu')
+            sparse_deformed = F.grid_sample(feature_repeat, sparse_motions, align_corners=False).to(out_device)
         sparse_deformed = sparse_deformed.view((bs, self.num_kp+1, -1, d, h, w))                        # (bs, num_kp+1, c, d, h, w)
 
         return sparse_deformed
@@ -61,7 +67,7 @@ class DenseMotionNetwork(nn.Module):
         # adding background feature
         try:
             zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1], spatial_size[2]).type(heatmap.type()).to(heatmap.device)
-        except:
+        except ValueError:
             zeros = torch.zeros(heatmap.shape[0], 1, spatial_size[0], spatial_size[1], spatial_size[2]).to(heatmap.device)
         heatmap = torch.cat([zeros, heatmap], dim=1)
         heatmap = heatmap.unsqueeze(2)         # (bs, 1+num_kp, 1, d, h, w)

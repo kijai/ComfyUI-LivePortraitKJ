@@ -38,6 +38,9 @@ def _transform_img_kornia(img, M, dsize, flags='bilinear', borderMode='zeros'):
     dsize: Target shape (width, height).
     """
     device = mm.get_torch_device()
+    if mm.is_device_mps(device): 
+        device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
+   
     # Convert dsize to tensor shape (H, W)
     _dsize = torch.tensor([dsize[1], dsize[0]])  # Kornia expects (H, W)
 
@@ -124,29 +127,53 @@ def parse_pt2_from_pt203(pt203, use_lip=True):
         pt2 = np.stack([pt_left_eye, pt_right_eye], axis=0)
     return pt2
 
+def parse_pt2_from_pt9(pt9, use_lip=True):
+    '''
+    animal_face = {"keypoints": ['right eye right', 'right eye left', 'left eye right', 'left eye left', 'nose tip', 'lip right', 'lip left', 'upper lip', 'lower lip'], "skeleton": []}
 
-def parse_pt2_from_pt68(pt68, use_lip=True):
-    """
-    parsing the 2 points according to the 68 points, which cancels the roll
-    """
-    lm_idx = np.array([31, 37, 40, 43, 46, 49, 55], dtype=np.int32) - 1
+
+    '''
     if use_lip:
-        pt5 = np.stack([
-            np.mean(pt68[lm_idx[[1, 2]], :], 0),  # left eye
-            np.mean(pt68[lm_idx[[3, 4]], :], 0),  # right eye
-            pt68[lm_idx[0], :],  # nose
-            pt68[lm_idx[5], :],  # lip
-            pt68[lm_idx[6], :]   # lip
+        pt9 = np.stack([
+            (pt9[2]+pt9[3])/2, # left eye
+            (pt9[0]+pt9[1])/2, # right eye
+            pt9[4],
+            # (pt9[5]+pt9[6]+pt9[7]+pt9[8])/4 # lip
+            (pt9[5] + pt9[6] ) / 2 # lip
         ], axis=0)
-
         pt2 = np.stack([
-            (pt5[0] + pt5[1]) / 2,
-            (pt5[3] + pt5[4]) / 2
+            (pt9[0] + pt9[1]) / 2, # eye
+            pt9[3] # lip
         ], axis=0)
     else:
         pt2 = np.stack([
-            np.mean(pt68[lm_idx[[1, 2]], :], 0),  # left eye
-            np.mean(pt68[lm_idx[[3, 4]], :], 0),  # right eye
+            (pt9[2] + pt9[3]) / 2,
+            (pt9[0] + pt9[1]) / 2,
+        ], axis=0)
+
+    return pt2
+
+def parse_pt2_from_pt68(pt68, use_lip=True):
+    '''
+face = {"keypoints": ['right cheekbone 1', 'right cheekbone 2', 'right cheek 1', 'right cheek 2', 'right cheek 3', 'right cheek 4', 'right cheek 5', 'right chin', 'chin center', 'left chin', 'left cheek 5', 'left cheek 4', 'left cheek 3', 'left cheek 2', 'left cheek 1', 'left cheekbone 2', 'left cheekbone 1', 'right eyebrow 1', 'right eyebrow 2', 'right eyebrow 3', 'right eyebrow 4', 'right eyebrow 5', 'left eyebrow 1', 'left eyebrow 2', 'left eyebrow 3', 'left eyebrow 4', 'left eyebrow 5', 'nasal bridge 1', 'nasal bridge 2', 'nasal bridge 3', 'nasal bridge 4', 'right nasal wing 1', 'right nasal wing 2', 'nasal wing center', 'left nasal wing 1', 'left nasal wing 2', 'right eye eye corner 1', 'right eye upper eyelid 1', 'right eye upper eyelid 2', 'right eye eye corner 2', 'right eye lower eyelid 2', 'right eye lower eyelid 1', 'left eye eye corner 1', 'left eye upper eyelid 1', 'left eye upper eyelid 2', 'left eye eye corner 2', 'left eye lower eyelid 2', 'left eye lower eyelid 1', 'right mouth corner', 'upper lip outer edge 1', 'upper lip outer edge 2', 'upper lip outer edge 3', 'upper lip outer edge 4', 'upper lip outer edge 5', 'left mouth corner', 'lower lip outer edge 5', 'lower lip outer edge 4', 'lower lip outer edge 3', 'lower lip outer edge 2', 'lower lip outer edge 1', 'upper lip inter edge 1', 'upper lip inter edge 2', 'upper lip inter edge 3', 'upper lip inter edge 4', 'upper lip inter edge 5', 'lower lip inter edge 3', 'lower lip inter edge 2', 'lower lip inter edge 1'], "skeleton": []}
+
+
+    '''
+    if use_lip:
+        pt68 = np.stack([
+            (pt68[42] + pt68[43] + pt68[44] + pt68[45] + pt68[46]+ pt68[47])/6, # left eye
+            (pt68[36] + pt68[37] + pt68[38] + pt68[39] + pt68[40] + pt68[41]) / 6,  # right eye
+            (pt68[48] + pt68[54])/2
+
+        ], axis=0)
+        pt2 = np.stack([
+            (pt68[0] + pt68[1]) / 2,
+            pt68[2]
+        ], axis=0)
+    else:
+        pt2 = np.stack([
+            (pt68[42] + pt68[43] + pt68[44] + pt68[45] + pt68[46] + pt68[47]) / 6,  # left eye
+            (pt68[36] + pt68[37] + pt68[38] + pt68[39] + pt68[40] + pt68[41]) / 6,  # right eye
         ], axis=0)
 
     return pt2
@@ -183,6 +210,8 @@ def parse_pt2_from_pt_x(pts, use_lip=True):
     elif pts.shape[0] > 101:
         # take the first 101 points
         pt2 = parse_pt2_from_pt101(pts[:101], use_lip=use_lip)
+    elif pts.shape[0] == 9:
+        pt2 = parse_pt2_from_pt9(pts, use_lip=use_lip)
     else:
         raise Exception(f'Unknow shape: {pts.shape}')
 
