@@ -2,3 +2,4 @@ pyyaml
 numpy
 opencv-python
 onnxruntime-gpu
+pykalman
