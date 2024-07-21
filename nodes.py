@@ -21,6 +21,7 @@ from .liveportrait.modules.appearance_feature_extractor import (
 from .liveportrait.modules.stitching_retargeting_network import (
     StitchingRetargetingNetwork,
 )
+from .liveportrait.utils.camera import get_rotation_matrix
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -402,6 +403,7 @@ class LivePortraitCropper:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
+            "pipeline": ("LIVEPORTRAITPIPE",),
             "cropper": ("LPCROPPER",),
             "source_image": ("IMAGE",),
             "dsize": ("INT", {"default": 512, "min": 64, "max": 2048}),
@@ -429,7 +431,7 @@ class LivePortraitCropper:
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
 
-    def process(self, cropper, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, face_index_order, rotate):
+    def process(self, pipeline, cropper, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, face_index_order, rotate):
         source_image_np = (source_image * 255).byte().numpy()
 
         crop_info_list = []
@@ -446,6 +448,28 @@ class LivePortraitCropper:
             cropped_images_list.append(cropped_image)
               
             pbar.update(1)
+
+        source_info = []
+        source_rot_list = []
+        f_s_list = []
+        x_s_list = []
+
+        for i in tqdm(range(source_image_np.shape[0]), desc='Processing source images...', total=source_image_np.shape[0]):
+            #get source keypoints info
+            img_crop_256x256 = crop_info_list[i]["img_crop_256x256"]
+            I_s = pipeline.live_portrait_wrapper.prepare_source(img_crop_256x256)
+            x_s_info = pipeline.live_portrait_wrapper.get_kp_info(I_s)
+            f_s = pipeline.live_portrait_wrapper.extract_feature_3d(I_s)
+            f_s_list.append(f_s)
+            source_info.append(x_s_info)
+
+            x_s = pipeline.live_portrait_wrapper.transform_keypoint(x_s_info)
+            x_s_list.append(x_s)
+
+            R_s = get_rotation_matrix(
+                x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"]
+            )
+            source_rot_list.append(R_s)
         
         cropped_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in cropped_images_list])
@@ -453,7 +477,11 @@ class LivePortraitCropper:
         )
 
         crop_info_dict = {
-            'crop_info_list': crop_info_list
+            'crop_info_list': crop_info_list,
+            'source_rot_list': source_rot_list,
+            'f_s_list': f_s_list,
+            'x_s_list': x_s_list,
+            'source_info': source_info
         }
 
         return (cropped_tensors_out, crop_info_dict)

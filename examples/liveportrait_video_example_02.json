@@ -1,6 +1,6 @@
 {
-  "last_node_id": 188,
-  "last_link_id": 443,
+  "last_node_id": 189,
+  "last_link_id": 447,
   "nodes": [
     {
       "id": 81,
@@ -252,8 +252,8 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            296,
-            408
+            408,
+            445
           ],
           "shape": 3,
           "slot_index": 0
@@ -282,94 +282,6 @@
       }
     },
     {
-      "id": 1,
-      "type": "DownloadAndLoadLivePortraitModels",
-      "pos": [
-        546,
-        -518
-      ],
-      "size": {
-        "0": 302.43463134765625,
-        "1": 58
-      },
-      "flags": {},
-      "order": 0,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "live_portrait_pipe",
-          "type": "LIVEPORTRAITPIPE",
-          "links": [
-            407
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "DownloadAndLoadLivePortraitModels"
-      },
-      "widgets_values": [
-        "fp16"
-      ]
-    },
-    {
-      "id": 131,
-      "type": "LivePortraitCropper",
-      "pos": [
-        -3,
-        -755
-      ],
-      "size": {
-        "0": 330,
-        "1": 246
-      },
-      "flags": {},
-      "order": 16,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "cropper",
-          "type": "LPCROPPER",
-          "link": 295
-        },
-        {
-          "name": "source_image",
-          "type": "IMAGE",
-          "link": 296
-        }
-      ],
-      "outputs": [
-        {
-          "name": "cropped_image",
-          "type": "IMAGE",
-          "links": null,
-          "shape": 3
-        },
-        {
-          "name": "crop_info",
-          "type": "CROPINFO",
-          "links": [
-            413
-          ],
-          "shape": 3,
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitCropper"
-      },
-      "widgets_values": [
-        512,
-        2.3,
-        0,
-        -0.125,
-        0,
-        "large-small",
-        true
-      ]
-    },
-    {
       "id": 129,
       "type": "LivePortraitLoadCropper",
       "pos": [
@@ -381,15 +293,15 @@
         "1": 82
       },
       "flags": {},
-      "order": 1,
+      "order": 0,
       "mode": 0,
       "outputs": [
         {
           "name": "cropper",
           "type": "LPCROPPER",
           "links": [
-            295,
-            403
+            403,
+            444
           ],
           "shape": 3,
           "slot_index": 0
@@ -440,7 +352,7 @@
         "1": 270
       },
       "flags": {},
-      "order": 2,
+      "order": 1,
       "mode": 0,
       "outputs": [
         {
@@ -588,7 +500,7 @@
         {
           "name": "crop_info",
           "type": "CROPINFO",
-          "link": 413,
+          "link": 447,
           "slot_index": 1
         },
         {
@@ -661,7 +573,7 @@
         "1": 82
       },
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "outputs": [
         {
@@ -694,8 +606,8 @@
         -371
       ],
       "size": [
-        1103.397512192384,
-        697.5853490318566
+        1103.3974609375,
+        697.5853313577586
       ],
       "flags": {},
       "order": 20,
@@ -747,7 +659,7 @@
           "hidden": false,
           "paused": false,
           "params": {
-            "filename": "LivePortrait_00009.mp4",
+            "filename": "LivePortrait_00001.mp4",
             "subfolder": "",
             "type": "temp",
             "format": "video/h264-mp4",
@@ -988,6 +900,11 @@
           "name": "source_image",
           "type": "IMAGE",
           "link": 437
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": null
         }
       ],
       "outputs": [
@@ -1076,7 +993,7 @@
         "1": 58
       },
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "properties": {
         "text": ""
@@ -1094,12 +1011,12 @@
         39,
         137
       ],
-      "size": [
-        229.16442871093705,
-        95.92726440429658
-      ],
+      "size": {
+        "0": 229.1644287109375,
+        "1": 95.92726135253906
+      },
       "flags": {},
-      "order": 5,
+      "order": 4,
       "mode": 0,
       "properties": {
         "text": ""
@@ -1109,6 +1026,102 @@
       ],
       "color": "#432",
       "bgcolor": "#653"
+    },
+    {
+      "id": 1,
+      "type": "DownloadAndLoadLivePortraitModels",
+      "pos": [
+        -1244,
+        -870
+      ],
+      "size": {
+        "0": 302.43463134765625,
+        "1": 58
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "live_portrait_pipe",
+          "type": "LIVEPORTRAITPIPE",
+          "links": [
+            407,
+            446
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DownloadAndLoadLivePortraitModels"
+      },
+      "widgets_values": [
+        "fp16"
+      ]
+    },
+    {
+      "id": 189,
+      "type": "LivePortraitCropper",
+      "pos": [
+        -3,
+        -755
+      ],
+      "size": {
+        "0": 330,
+        "1": 242
+      },
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pipeline",
+          "type": "LIVEPORTRAITPIPE",
+          "link": 446,
+          "slot_index": 0
+        },
+        {
+          "name": "cropper",
+          "type": "LPCROPPER",
+          "link": 444
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 445
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cropped_image",
+          "type": "IMAGE",
+          "links": null,
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "crop_info",
+          "type": "CROPINFO",
+          "links": [
+            447
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitCropper"
+      },
+      "widgets_values": [
+        512,
+        2.3,
+        0,
+        -0.125,
+        0,
+        "large-small",
+        true
+      ]
     }
   ],
   "links": [
@@ -1127,22 +1140,6 @@
       81,
       0,
       "MASK"
-    ],
-    [
-      295,
-      129,
-      0,
-      131,
-      0,
-      "LPCROPPER"
-    ],
-    [
-      296,
-      78,
-      0,
-      131,
-      1,
-      "IMAGE"
     ],
     [
       302,
@@ -1199,14 +1196,6 @@
       176,
       4,
       "MASK"
-    ],
-    [
-      413,
-      131,
-      1,
-      176,
-      1,
-      "CROPINFO"
     ],
     [
       426,
@@ -1287,16 +1276,48 @@
       186,
       0,
       "IMAGE"
+    ],
+    [
+      444,
+      129,
+      0,
+      189,
+      1,
+      "LPCROPPER"
+    ],
+    [
+      445,
+      78,
+      0,
+      189,
+      2,
+      "IMAGE"
+    ],
+    [
+      446,
+      1,
+      0,
+      189,
+      0,
+      "LIVEPORTRAITPIPE"
+    ],
+    [
+      447,
+      189,
+      1,
+      176,
+      1,
+      "CROPINFO"
     ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.5644739300537777,
+      "scale": 0.6830134553650711,
       "offset": {
-        "0": 1874.4561767578125,
-        "1": 1039.090087890625
+        "0": 1494.1269197578126,
+        "1": 923.177290890625
       }
     }
   },

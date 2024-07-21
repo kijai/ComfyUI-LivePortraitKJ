@@ -10,7 +10,7 @@ import numpy as np
 from .config.inference_config import InferenceConfig
 import torch
 from .utils.camera import get_rotation_matrix
-from .utils.crop import _transform_img, _transform_img_kornia
+from .utils.crop import _transform_img_kornia
 from .live_portrait_wrapper import LivePortraitWrapper
 from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 from .utils.filter import smooth
@@ -68,23 +68,10 @@ class LivePortraitPipeline(object):
         else:
             total_frames = driving_images.shape[0]
 
-
-        source_info = []
-        source_rot_list = []
-        f_s_list = []
-        for i in tqdm(range(source_np.shape[0]), desc='Processing source images...', total=source_np.shape[0]):
-            #get source keypoints info
-            img_crop_256x256 = crop_info["crop_info_list"][i]["img_crop_256x256"]
-            I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
-            x_s_info = self.live_portrait_wrapper.get_kp_info(I_s)
-            f_s = self.live_portrait_wrapper.extract_feature_3d(I_s)
-            f_s_list.append(f_s)
-            source_info.append(x_s_info)
-
-            R_s = get_rotation_matrix(
-                x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"]
-            )
-            source_rot_list.append(R_s)
+        source_info = crop_info["source_info"]
+        source_rot_list = crop_info["source_rot_list"]
+        f_s_list = crop_info["f_s_list"]
+        x_s_list = crop_info["x_s_list"]
 
         driving_info = []
         driving_exp_list = []
@@ -137,11 +124,11 @@ class LivePortraitPipeline(object):
             x_d_info = driving_info[i]
             x_s_info = source_info[safe_index]
 
-            x_c_s = x_s_info["kp"]
-
             R_s = source_rot_list[safe_index]
             f_s = f_s_list[safe_index]
-            x_s = self.live_portrait_wrapper.transform_keypoint(x_s_info)
+            x_s = x_s_list[safe_index]
+
+            x_c_s = x_s_info["kp"]
 
             #lip zero
             if inference_cfg.flag_lip_zero:
