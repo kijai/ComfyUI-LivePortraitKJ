@@ -13,6 +13,7 @@ from .utils.camera import get_rotation_matrix
 from .utils.crop import _transform_img, _transform_img_kornia
 from .live_portrait_wrapper import LivePortraitWrapper
 from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
+from .utils.filter import smooth
 
 import os
 script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -52,7 +53,7 @@ class LivePortraitPipeline(object):
             return source_np[mirror_idx]
 
     def execute(
-        self, source_np, driving_images, crop_info, driving_landmarks, delta_multiplier = 1.0, mismatch_method="constant"
+        self, source_np, driving_images, crop_info, driving_landmarks, delta_multiplier, relative_motion_mode, driving_smooth_observation_variance, mismatch_method="constant", 
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
         device = inference_cfg.device_id
@@ -62,10 +63,61 @@ class LivePortraitPipeline(object):
         out_mask_list = []
         R_d_0, x_d_0_info = None, None
 
-        if mismatch_method == "cut" or inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
+        if mismatch_method == "cut":
             total_frames = source_np.shape[0]
         else:
             total_frames = driving_images.shape[0]
+
+
+        source_info = []
+        source_rot_list = []
+        f_s_list = []
+        for i in tqdm(range(source_np.shape[0]), desc='Processing source images...', total=source_np.shape[0]):
+            #get source keypoints info
+            img_crop_256x256 = crop_info["crop_info_list"][i]["img_crop_256x256"]
+            I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
+            x_s_info = self.live_portrait_wrapper.get_kp_info(I_s)
+            f_s = self.live_portrait_wrapper.extract_feature_3d(I_s)
+            f_s_list.append(f_s)
+            source_info.append(x_s_info)
+
+            R_s = get_rotation_matrix(
+                x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"]
+            )
+            source_rot_list.append(R_s)
+
+        driving_info = []
+        driving_exp_list = []
+        driving_rot_list = []
+        
+        for i in tqdm(range(driving_images.shape[0]), desc='Processing driving images...', total=driving_images.shape[0]):
+            #get driving keypoints info
+            x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
+            safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
+            if i == 0:
+                first = x_d_info
+
+            driving_info.append(x_d_info)
+
+            driving_exp = source_info[safe_index]["exp"] + x_d_info["exp"] - first["exp"]
+            driving_exp_list.append(driving_exp.cpu())
+
+            R_d = get_rotation_matrix(
+                x_d_info["pitch"], x_d_info["yaw"], x_d_info["roll"]
+            )
+            driving_rot_list.append(R_d)
+
+        if relative_motion_mode == "source_video_smoothed":
+            x_d_r_lst = []
+            first_driving_rot = driving_rot_list[0].cpu().numpy().astype(np.float32).transpose(0, 2, 1)
+            for i in tqdm(range(source_np.shape[0]), desc='Smoothing...', total=source_np.shape[0]):
+                driving_rot = driving_rot_list[i].cpu().numpy().astype(np.float32)
+                source_rot = source_rot_list[i].cpu().numpy().astype(np.float32)
+                dot = np.dot(driving_rot, first_driving_rot) @ source_rot
+                x_d_r_lst.append(dot)
+  
+            driving_exp_list_smooth = smooth(driving_exp_list, source_info[0]["exp"].shape, device, observation_variance=driving_smooth_observation_variance)
+            driving_rot_list_smooth = smooth(x_d_r_lst, source_rot_list[0].shape, device, observation_variance=driving_smooth_observation_variance)
 
         pbar = comfy.utils.ProgressBar(total_frames)
 
@@ -81,26 +133,14 @@ class LivePortraitPipeline(object):
                 continue
 
             source_lmk = crop_info["crop_info_list"][safe_index]["lmk_crop"]
-            img_crop_256x256 = crop_info["crop_info_list"][safe_index]["img_crop_256x256"]
+            
+            x_d_info = driving_info[i]
+            x_s_info = source_info[safe_index]
 
-            x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
-
-            if mismatch_method == "cut" or inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-                source_frame_rgb = source_np[safe_index]
-            else:
-                source_frame_rgb = self._get_source_frame(source_np, i, mismatch_method)
-
-            if inference_cfg.flag_do_crop:
-                I_s = self.live_portrait_wrapper.prepare_source(img_crop_256x256)
-            else:
-                I_s = self.live_portrait_wrapper.prepare_source(source_frame_rgb)
-
-            x_s_info = self.live_portrait_wrapper.get_kp_info(I_s)
             x_c_s = x_s_info["kp"]
-            R_s = get_rotation_matrix(
-                x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"]
-            )
-            f_s = self.live_portrait_wrapper.extract_feature_3d(I_s)
+
+            R_s = source_rot_list[safe_index]
+            f_s = f_s_list[safe_index]
             x_s = self.live_portrait_wrapper.transform_keypoint(x_s_info)
 
             #lip zero
@@ -113,22 +153,30 @@ class LivePortraitPipeline(object):
                 else:
                     lip_delta_before_animation = (self.live_portrait_wrapper.retarget_lip(x_s, combined_lip_ratio_tensor_before_animation))
 
-            R_d = get_rotation_matrix(
-                x_d_info["pitch"], x_d_info["yaw"], x_d_info["roll"]
-            )
+            R_d = driving_rot_list[i]
 
             if i == 0:
                 R_d_0 = R_d
                 x_d_0_info = x_d_info
 
-            if inference_cfg.flag_relative:
+            if relative_motion_mode == "relative":
                 R_new = (R_d @ R_d_0.permute(0, 2, 1)) @ R_s
                 delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_d_0_info["exp"])
                 scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_d_0_info["scale"])
                 t_new = x_s_info["t"] + (x_d_info["t"] - x_d_0_info["t"])
+            elif relative_motion_mode == "source_video_smoothed":
+                R_new = driving_rot_list_smooth[i]
+                delta_new = driving_exp_list_smooth[i]
+                scale_new = x_s_info["scale"]
+                t_new = x_d_info["t"]
+            elif relative_motion_mode == "relative_rotation_only":
+                R_new = R_s
+                delta_new = x_s_info['exp']
+                scale_new = x_s_info["scale"]
+                t_new = x_d_info["t"]
             else:
-                R_new = R_s if inference_cfg.flag_relative_rotation_only else R_d
-                delta_new = x_d_info["exp"]
+                R_new = R_d
+                delta_new = x_s_info['exp']
                 scale_new = x_s_info["scale"]
                 t_new = x_d_info["t"]
 
@@ -232,16 +280,14 @@ class LivePortraitPipeline(object):
             cropped_image = torch.clamp(out["out"], 0, 1).permute(0, 2, 3, 1)
            
             cropped_image_list.append(cropped_image)
+
+            if mismatch_method == "cut" or inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
+                source_frame_rgb = source_np[safe_index]
+            else:
+                source_frame_rgb = self._get_source_frame(source_np, i, mismatch_method)
         
             # Transform and blend
-            if inference_cfg.flag_pasteback:
-                # cropped_image_np = self.live_portrait_wrapper.parse_output(out["out"])[0]
-                # cropped_image_to_original = _transform_img(
-                # cropped_image_np,
-                # crop_info["crop_info_list"][safe_index]["M_c2o"],
-                # dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
-                # )
-                
+            if inference_cfg.flag_pasteback:                
                 cropped_image_to_original = _transform_img_kornia(
                 cropped_image,
                 crop_info["crop_info_list"][safe_index]["M_c2o"],
@@ -253,11 +299,6 @@ class LivePortraitPipeline(object):
                     crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
                     )
-                
-                #mask_ori = mask_ori.astype(np.float32) / 255.0
-                # cropped_image_to_original_blend = np.clip(
-                #     mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame_rgb, 0, 255
-                #     ).astype(np.uint8)
 
                 source_frame_torch = torch.from_numpy(source_frame_rgb).unsqueeze(0).permute(0, 3, 1, 2).to(mask_ori.device) / 255
 

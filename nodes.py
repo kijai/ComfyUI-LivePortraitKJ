@@ -239,11 +239,9 @@ class LivePortraitProcess:
             "crop_info": ("CROPINFO", {"default": {}}),
             "source_image": ("IMAGE",),
             "driving_images": ("IMAGE",),
-            "lip_zero": ("BOOLEAN", {"default": True}),
+            "lip_zero": ("BOOLEAN", {"default": False}),
             "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.001, "max": 4.0, "step": 0.001}),
             "stitching": ("BOOLEAN", {"default": True}),
-            "relative": ("BOOLEAN", {"default": True}),
-            "flag_relative_rotation_only": ("BOOLEAN", {"default": True}),
             "delta_multiplier": ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.001}),
             "mismatch_method": (
                     [
@@ -254,7 +252,18 @@ class LivePortraitProcess:
                     ],
                     {"default": "constant"},
                 ),
+            
+            "relative_motion_mode": (
+                    [
+                        "relative",
+                        "source_video_smoothed",
+                        "relative_rotation_only",
+                        "off"
+                    ],
+                ),
+            "driving_smooth_observation_variance": ("FLOAT", {"default": 3e-6, "min": 1e-11, "max": 1e-2, "step": 1e-11}),
             },
+            
             "optional": {
                 "mask": ("MASK", {"default": None}),
                 "opt_retargeting_info": ("RETARGETINGINFO", {"default": None}),
@@ -283,8 +292,8 @@ class LivePortraitProcess:
         lip_zero: bool,
         lip_zero_threshold: float,
         stitching: bool,
-        relative: bool,
-        flag_relative_rotation_only: bool,
+        relative_motion_mode: str,
+        driving_smooth_observation_variance: float,
         delta_multiplier: float = 1.0,
         mismatch_method: str = "constant",
         mask: torch.Tensor = None,
@@ -308,20 +317,19 @@ class LivePortraitProcess:
             driving_landmarks = None
 
         pipeline.live_portrait_wrapper.cfg.flag_stitching = stitching
-        pipeline.live_portrait_wrapper.cfg.flag_relative = relative
-        pipeline.live_portrait_wrapper.cfg.flag_relative_rotation_only = flag_relative_rotation_only
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
         pipeline.live_portrait_wrapper.cfg.lip_zero_threshold = lip_zero_threshold
+
+        if relative_motion_mode != "off":
+            pipeline.live_portrait_wrapper.cfg.flag_relative = True
+        else:
+            pipeline.live_portrait_wrapper.cfg.flag_relative = False
 
         if lip_zero and opt_retargeting_info is not None:
             log.warning("Warning: lip_zero only has an effect with lip or eye retargeting")
 
         if mask is not None:
-            # crop_mask = mask[0].cpu().numpy()
-            # crop_mask = (crop_mask * 255).astype(np.uint8)
-            # crop_mask = np.repeat(np.atleast_3d(crop_mask), 3, axis=2)
             crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
-
             pipeline.live_portrait_wrapper.cfg.mask_crop = crop_mask
         else:
             log.info("Using default mask template")
@@ -340,6 +348,8 @@ class LivePortraitProcess:
             crop_info, 
             driving_landmarks,
             delta_multiplier,
+            relative_motion_mode,
+            driving_smooth_observation_variance,
             mismatch_method
         )
       
@@ -350,15 +360,6 @@ class LivePortraitProcess:
 
         mask_tensors_out = torch.cat(out_mask_list, dim=0)
         mask_tensors_out = mask_tensors_out[:, :, :, 0]
-        
-        # full_tensors_out = (
-        #     torch.stack([torch.from_numpy(np_array) for np_array in full_out_list])
-        #     / 255
-        # )
-        
-        # mask_tensors_out = (
-        #     torch.stack([torch.from_numpy(np_array) for np_array in out_mask_list])
-        # )[:, :, :, 0]
         
         return (
             cropped_out_tensors.cpu().float(), 
