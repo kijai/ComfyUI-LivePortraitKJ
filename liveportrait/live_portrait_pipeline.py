@@ -174,6 +174,11 @@ class LivePortraitPipeline(object):
                 delta_new = x_s_info['exp']
                 scale_new = x_s_info["scale"]
                 t_new = x_d_info["t"]
+            elif relative_motion_mode == "single_frame":
+                R_new = R_d
+                delta_new = x_d_info['exp']
+                scale_new = x_s_info["scale"]
+                t_new = x_d_info["t"]
             else:
                 R_new = R_d
                 delta_new = x_s_info['exp']
