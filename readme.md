@@ -1,7 +1,12 @@
 # ComfyUI nodes to use [LivePortrait](https://github.com/KwaiVGI/LivePortrait)
 
+## Update
 
-https://github.com/kijai/ComfyUI-LivePortrait/assets/40791699/e55e10f6-af61-4d73-b162-af29eb847516
+Rework of almost the whole thing that's been in develop is now merged into main, this means old workflows will not work, but everything should be faster and there's lots of new features.
+For legacy purposes the old main branch is moved to the legacy -branch
+
+
+
 
 
 I have converted all the pickle files to safetensors: https://huggingface.co/Kijai/LivePortrait_safetensors/tree/main
