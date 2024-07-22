@@ -35,8 +35,6 @@ class InferenceConfig(PrintableConfig):
     output_fps: int = 30  # fps for output video
     crf: int = 15  # crf for output video
 
-    flag_pasteback: bool = True  # whether to paste-back/stitch the animated face cropping from the face-cropping space to the original image space
-    mask_crop = None
     flag_write_gif: bool = False
 
     device_id: int = 0

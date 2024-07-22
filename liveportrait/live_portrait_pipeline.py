@@ -8,9 +8,7 @@ import comfy.utils
 from tqdm import tqdm
 import numpy as np
 from .config.inference_config import InferenceConfig
-import torch
 from .utils.camera import get_rotation_matrix
-from .utils.crop import _transform_img_kornia
 from .live_portrait_wrapper import LivePortraitWrapper
 from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 from .utils.filter import smooth
@@ -66,6 +64,9 @@ class LivePortraitPipeline(object):
         else:
             total_frames = driving_images.shape[0]
 
+        
+        disable_progress_bar = True if relative_motion_mode == "single_frame" else False
+
         source_info = crop_info["source_info"]
         source_rot_list = crop_info["source_rot_list"]
         f_s_list = crop_info["f_s_list"]
@@ -75,7 +76,7 @@ class LivePortraitPipeline(object):
         driving_exp_list = []
         driving_rot_list = []
         
-        for i in tqdm(range(driving_images.shape[0]), desc='Processing driving images...', total=driving_images.shape[0]):
+        for i in tqdm(range(driving_images.shape[0]), desc='Processing driving images...', total=driving_images.shape[0], disable=disable_progress_bar):
             #get driving keypoints info
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
             if crop_info["crop_info_list"][safe_index] is None:
@@ -115,7 +116,7 @@ class LivePortraitPipeline(object):
 
         pbar = comfy.utils.ProgressBar(total_frames)
 
-        for i in tqdm(range(total_frames), desc='Animating...', total=total_frames):
+        for i in tqdm(range(total_frames), desc='Animating...', total=total_frames, disable=disable_progress_bar):
 
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
 
@@ -128,10 +129,10 @@ class LivePortraitPipeline(object):
             source_lmk = crop_info["crop_info_list"][safe_index]["lmk_crop"]
             
             x_d_info = driving_info[i]
-            x_s_info = source_info[safe_index]
-
-            R_s = source_rot_list[safe_index]
             R_d = driving_rot_list[i]
+
+            x_s_info = source_info[safe_index]
+            R_s = source_rot_list[safe_index]
             f_s = f_s_list[safe_index]
             x_s = x_s_list[safe_index]
 

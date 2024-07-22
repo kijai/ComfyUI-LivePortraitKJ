@@ -256,16 +256,6 @@ class LivePortraitWrapper(object):
 
         return ret_dct
 
-    def parse_output(self, out: torch.Tensor) -> np.ndarray:
-        """ construct the output as standard
-        return: 1xHxWx3, uint8
-        """
-        out = np.transpose(out.data.cpu().numpy(), [0, 2, 3, 1])  # 1x3xHxW -> 1xHxWx3
-        out = np.clip(out, 0, 1)  # clip to 0~1
-        out = np.clip(out * 255, 0, 255).astype(np.uint8)  # 0~1 -> 0~255
-
-        return out
-
     def calc_retargeting_ratio(self, source_lmk, driving_lmk_lst):
         input_eye_ratio_lst = []
         input_lip_ratio_lst = []

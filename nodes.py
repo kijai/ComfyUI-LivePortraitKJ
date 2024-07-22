@@ -31,7 +31,6 @@ log = logging.getLogger(__name__)
 class InferenceConfig:
     def __init__(
         self,
-        mask_crop=None,
         flag_use_half_precision=True,
         flag_lip_zero=True,
         lip_zero_threshold=0.03,
@@ -39,9 +38,7 @@ class InferenceConfig:
         flag_lip_retargeting=False,
         flag_stitching=True,
         flag_relative=True,
-        flag_relative_rotation_only=False,
         input_shape=(256, 256),
-        flag_pasteback=True,
         device_id=0,
         flag_do_crop=True,
         flag_do_rot=True,
@@ -53,13 +50,10 @@ class InferenceConfig:
         self.flag_lip_retargeting = flag_lip_retargeting
         self.flag_stitching = flag_stitching
         self.flag_relative = flag_relative
-        self.flag_relative_rotation_only = flag_relative_rotation_only
         self.input_shape = input_shape
-        self.flag_pasteback = flag_pasteback
         self.device_id = device_id
         self.flag_do_crop = flag_do_crop
         self.flag_do_rot = flag_do_rot
-        self.mask_crop = mask_crop
         
 class DownloadAndLoadLivePortraitModels:
     @classmethod
@@ -547,11 +541,18 @@ class LivePortraitCropper:
     def process(self, pipeline, cropper, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, face_index_order, rotate):
         source_image_np = (source_image * 255).byte().numpy()
 
+        # Initialize lists
         crop_info_list = []
         cropped_images_list = []
-       
+        source_info = []
+        source_rot_list = []
+        f_s_list = []
+        x_s_list = []
+        
+        # Initialize a progress bar for the combined operation
         pbar = comfy.utils.ProgressBar(len(source_image_np))
-        for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
+        for i in tqdm(range(len(source_image_np)), desc='Detecting, cropping, and processing..', total=len(source_image_np)):
+            # Cropping operation
             crop_info = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
             
             if crop_info:
@@ -562,36 +563,28 @@ class LivePortraitCropper:
                 crop_info_list.append(None)
                 log.warning(f"Warning: No face detected on frame {str(i)}, skipping")
             cropped_images_list.append(cropped_image)
-              
-            pbar.update(1)
-
-        source_info = []
-        source_rot_list = []
-        f_s_list = []
-        x_s_list = []
-
-        for i in tqdm(range(source_image_np.shape[0]), desc='Processing source images...', total=source_image_np.shape[0]):
-            #get source keypoints info
-            if crop_info_list[i] == None:
+            
+            # Processing source images
+            if crop_info:
+                I_s = pipeline.live_portrait_wrapper.prepare_source(cropped_image)
+                x_s_info = pipeline.live_portrait_wrapper.get_kp_info(I_s)
+                f_s = pipeline.live_portrait_wrapper.extract_feature_3d(I_s)
+                f_s_list.append(f_s)
+                source_info.append(x_s_info)
+        
+                x_s = pipeline.live_portrait_wrapper.transform_keypoint(x_s_info)
+                x_s_list.append(x_s)
+        
+                R_s = get_rotation_matrix(x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"])
+                source_rot_list.append(R_s)
+            else:
                 f_s_list.append(None)
                 x_s_list.append(None)
                 source_info.append(None)
                 source_rot_list.append(None)
-                continue
-            img_crop_256x256 = crop_info_list[i]["img_crop_256x256"]
-            I_s = pipeline.live_portrait_wrapper.prepare_source(img_crop_256x256)
-            x_s_info = pipeline.live_portrait_wrapper.get_kp_info(I_s)
-            f_s = pipeline.live_portrait_wrapper.extract_feature_3d(I_s)
-            f_s_list.append(f_s)
-            source_info.append(x_s_info)
-
-            x_s = pipeline.live_portrait_wrapper.transform_keypoint(x_s_info)
-            x_s_list.append(x_s)
-
-            R_s = get_rotation_matrix(
-                x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"]
-            )
-            source_rot_list.append(R_s)
+        
+            # Update progress bar
+            pbar.update(1)
         
         cropped_tensors_out = (
             torch.stack([torch.from_numpy(np_array) for np_array in cropped_images_list])
