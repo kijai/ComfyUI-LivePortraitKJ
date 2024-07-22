@@ -58,9 +58,6 @@ class LivePortraitPipeline(object):
         inference_cfg = self.live_portrait_wrapper.cfg
         device = inference_cfg.device_id
 
-        cropped_image_list = []
-        composited_image_list = []
-        out_mask_list = []
         out_list = []
         R_d_0, x_d_0_info = None, None
 
@@ -80,8 +77,14 @@ class LivePortraitPipeline(object):
         
         for i in tqdm(range(driving_images.shape[0]), desc='Processing driving images...', total=driving_images.shape[0]):
             #get driving keypoints info
-            x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
+            if crop_info["crop_info_list"][safe_index] is None:
+                driving_info.append(None)
+                driving_rot_list.append(None)
+                driving_exp_list.append(None)
+                continue
+            x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
+            
             if i == 0:
                 first = x_d_info
 
@@ -99,6 +102,9 @@ class LivePortraitPipeline(object):
             x_d_r_lst = []
             first_driving_rot = driving_rot_list[0].cpu().numpy().astype(np.float32).transpose(0, 2, 1)
             for i in tqdm(range(source_np.shape[0]), desc='Smoothing...', total=source_np.shape[0]):
+                if driving_rot_list[i] is None:
+                    x_d_r_lst.append(None)
+                    continue
                 driving_rot = driving_rot_list[i].cpu().numpy().astype(np.float32)
                 source_rot = source_rot_list[i].cpu().numpy().astype(np.float32)
                 dot = np.dot(driving_rot, first_driving_rot) @ source_rot
@@ -114,10 +120,9 @@ class LivePortraitPipeline(object):
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
 
             # skip and return empty frames if no crop due to no face detected
-            if not crop_info["crop_info_list"][safe_index]:
-                composited_image_list.append(source_np[safe_index])
-                cropped_image_list.append(torch.zeros(1, 512, 512, 3, dtype=torch.float32, device = device))
-                out_mask_list.append(np.zeros((source_np.shape[1], source_np.shape[2], 3), dtype=np.uint8))
+            if crop_info["crop_info_list"][safe_index] is None:
+                out_list.append({})
+                pbar.update(1)
                 continue
 
             source_lmk = crop_info["crop_info_list"][safe_index]["lmk_crop"]

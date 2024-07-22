@@ -326,11 +326,14 @@ class LivePortraitProcess:
 
         if lip_zero and opt_retargeting_info is not None:
             log.warning("Warning: lip_zero only has an effect with lip or eye retargeting")
+        
+        if driving_images.shape[1] != 256 or driving_images.shape[2] != 256:
+            driving_images_256 = comfy.utils.common_upscale(driving_images.permute(0, 3, 1, 2), 256, 256, "lanczos", "disabled")
+        else:
+            driving_images_256 = driving_images.permute(0, 3, 1, 2)
 
-        driving_images_256 = comfy.utils.common_upscale(driving_images.permute(0, 3, 1, 2), 256, 256, "lanczos", "disabled")
         if pipeline.live_portrait_wrapper.cfg.flag_use_half_precision:
             driving_images_256 = driving_images_256.to(torch.float16)
-
 
         out = pipeline.execute(
             source_np, 
@@ -343,14 +346,22 @@ class LivePortraitProcess:
             mismatch_method
         )
 
-        cropped_image_list = []
+        
         total_frames = len(out["out_list"])
+      
 
-        for i in (range(total_frames)):
-            cropped_image = torch.clamp(out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
-            cropped_image_list.append(cropped_image)
+        if total_frames > 1:
+            cropped_image_list = []
+            for i in (range(total_frames)):
+                if not out["out_list"][i]:
+                    cropped_image_list.append(torch.zeros(1, 512, 512, 3, dtype=torch.float32, device = "cpu"))
+                else:
+                    cropped_image = torch.clamp(out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1).cpu()
+                    cropped_image_list.append(cropped_image)
 
-        cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
+            cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
+        else:
+            cropped_out_tensors = torch.clamp(out["out_list"][0]["out"], 0, 1).permute(0, 2, 3, 1)
       
         return (cropped_out_tensors, out,)
     
@@ -381,6 +392,9 @@ class LivePortraitComposite:
 
     def process(self, source_image, cropped_image, liveportrait_out, mask=None):
         mm.soft_empty_cache()
+        device = mm.get_torch_device()
+        if mm.is_device_mps(device): 
+            device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
 
         B, H, W, C = source_image.shape
         source_image = source_image.permute(0, 3, 1, 2) # B,H,W,C -> B,C,H,W
@@ -407,32 +421,39 @@ class LivePortraitComposite:
         pbar = comfy.utils.ProgressBar(total_frames)
         for i in tqdm(range(total_frames), desc='Compositing..', total=total_frames):
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
-            cropped_image = torch.clamp(liveportrait_out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
 
-            # Transform and blend             
-            cropped_image_to_original = _transform_img_kornia(
-                cropped_image,
-                crop_info["crop_info_list"][safe_index]["M_c2o"],
-                dsize=(W, H),
-                )
-
-            mask_ori = _transform_img_kornia(
-                crop_mask,
-                crop_info["crop_info_list"][safe_index]["M_c2o"],
-                dsize=(W, H),
-                )
-            
             if liveportrait_out["mismatch_method"] == "cut":
-                source_frame = source_image[safe_index].unsqueeze(0).to(mask_ori.device)
+                source_frame = source_image[safe_index].unsqueeze(0).to(device)
             else:
-                source_frame = _get_source_frame(source_image, i, liveportrait_out["mismatch_method"]).unsqueeze(0).to(mask_ori.device)
-                
-            cropped_image_to_original_blend = torch.clip(
-                    mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
+                source_frame = _get_source_frame(source_image, i, liveportrait_out["mismatch_method"]).unsqueeze(0).to(device)
+
+            if not liveportrait_out["out_list"][i]:
+                composited_image_list.append(source_frame)
+                out_mask_list.append(torch.zeros((1, 3, H, W), device=device))
+            else:
+                cropped_image = torch.clamp(liveportrait_out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
+
+                # Transform and blend             
+                cropped_image_to_original = _transform_img_kornia(
+                    cropped_image,
+                    crop_info["crop_info_list"][safe_index]["M_c2o"],
+                    dsize=(W, H),
+                    device=device
                     )
 
-            composited_image_list.append(cropped_image_to_original_blend)
-            out_mask_list.append(mask_ori)
+                mask_ori = _transform_img_kornia(
+                    crop_mask,
+                    crop_info["crop_info_list"][safe_index]["M_c2o"],
+                    dsize=(W, H),
+                    device=device
+                    )
+               
+                cropped_image_to_original_blend = torch.clip(
+                        mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
+                        )
+
+                composited_image_list.append(cropped_image_to_original_blend)
+                out_mask_list.append(mask_ori)
             pbar.update(1)
 
         full_tensors_out = torch.cat(composited_image_list, dim=0)
@@ -532,11 +553,14 @@ class LivePortraitCropper:
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting and cropping..', total=len(source_image_np)):
             crop_info = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
-            crop_info_list.append(crop_info)
+            
             if crop_info:
                 cropped_image = crop_info['img_crop_256x256']
+                crop_info_list.append(crop_info)
             else:
                 cropped_image = np.zeros((256, 256, 3), dtype=np.uint8)
+                crop_info_list.append(None)
+                log.warning(f"Warning: No face detected on frame {str(i)}, skipping")
             cropped_images_list.append(cropped_image)
               
             pbar.update(1)
@@ -548,6 +572,12 @@ class LivePortraitCropper:
 
         for i in tqdm(range(source_image_np.shape[0]), desc='Processing source images...', total=source_image_np.shape[0]):
             #get source keypoints info
+            if crop_info_list[i] == None:
+                f_s_list.append(None)
+                x_s_list.append(None)
+                source_info.append(None)
+                source_rot_list.append(None)
+                continue
             img_crop_256x256 = crop_info_list[i]["img_crop_256x256"]
             I_s = pipeline.live_portrait_wrapper.prepare_source(img_crop_256x256)
             x_s_info = pipeline.live_portrait_wrapper.get_kp_info(I_s)
@@ -567,7 +597,7 @@ class LivePortraitCropper:
             torch.stack([torch.from_numpy(np_array) for np_array in cropped_images_list])
             / 255
         )
-
+        
         crop_info_dict = {
             'crop_info_list': crop_info_list,
             'source_rot_list': source_rot_list,

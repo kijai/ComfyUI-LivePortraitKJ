@@ -30,16 +30,13 @@ def _transform_img(img, M, dsize, flags=CV2_INTERP, borderMode=None):
 import torch
 import kornia.geometry.transform as KGT
 
-def _transform_img_kornia(img, M, dsize, flags='bilinear', borderMode='zeros'):
+def _transform_img_kornia(img, M, dsize, device, flags='bilinear', borderMode='zeros'):
     """Conduct similarity or affine transformation to the image using Kornia.
     
     img: Input image as a PyTorch tensor of shape (C, H, W).
     M: 2x3 transformation matrix as a PyTorch tensor.
     dsize: Target shape (width, height).
     """
-    device = mm.get_torch_device()
-    if mm.is_device_mps(device): 
-        device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
    
     # Convert dsize to tensor shape (H, W)
     _dsize = torch.tensor([dsize[1], dsize[0]])  # Kornia expects (H, W)
