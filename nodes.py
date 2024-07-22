@@ -22,6 +22,7 @@ from .liveportrait.modules.stitching_retargeting_network import (
     StitchingRetargetingNetwork,
 )
 from .liveportrait.utils.camera import get_rotation_matrix
+from .liveportrait.utils.crop import _transform_img_kornia
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -59,7 +60,7 @@ class InferenceConfig:
         self.flag_do_crop = flag_do_crop
         self.flag_do_rot = flag_do_rot
         self.mask_crop = mask_crop
-
+        
 class DownloadAndLoadLivePortraitModels:
     @classmethod
     def INPUT_TYPES(s):
@@ -267,20 +268,17 @@ class LivePortraitProcess:
             },
             
             "optional": {
-                "mask": ("MASK", {"default": None}),
                 "opt_retargeting_info": ("RETARGETINGINFO", {"default": None}),
             }
         }
 
     RETURN_TYPES = (
         "IMAGE",
-        "IMAGE",
-        "MASK",
+        "LP_OUT",
     )
     RETURN_NAMES = (
-        "cropped_images",
-        "full_images",
-        "mask",
+        "cropped_image",
+        "output",
     )
     FUNCTION = "process"
     CATEGORY = "LivePortrait"
@@ -298,7 +296,6 @@ class LivePortraitProcess:
         driving_smooth_observation_variance: float,
         delta_multiplier: float = 1.0,
         mismatch_method: str = "constant",
-        mask: torch.Tensor = None,
         opt_retargeting_info: dict = None,
     ):
         if driving_images.shape[0] < source_image.shape[0]:
@@ -330,21 +327,12 @@ class LivePortraitProcess:
         if lip_zero and opt_retargeting_info is not None:
             log.warning("Warning: lip_zero only has an effect with lip or eye retargeting")
 
-        if mask is not None:
-            crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
-            pipeline.live_portrait_wrapper.cfg.mask_crop = crop_mask
-        else:
-            log.info("Using default mask template")
-            pipeline.live_portrait_wrapper.cfg.mask_crop = cv2.imread(os.path.join(script_directory, "liveportrait", "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
-
         driving_images_256 = comfy.utils.common_upscale(driving_images.permute(0, 3, 1, 2), 256, 256, "lanczos", "disabled")
         if pipeline.live_portrait_wrapper.cfg.flag_use_half_precision:
             driving_images_256 = driving_images_256.to(torch.float16)
 
-        cropped_out_list = []
-        full_out_list = []
 
-        cropped_out_list, full_out_list, out_mask_list = pipeline.execute(
+        out = pipeline.execute(
             source_np, 
             driving_images_256, 
             crop_info, 
@@ -354,20 +342,124 @@ class LivePortraitProcess:
             driving_smooth_observation_variance,
             mismatch_method
         )
-      
-        cropped_out_tensors = torch.cat(cropped_out_list, dim=0)
 
-        full_tensors_out = torch.cat(full_out_list, dim=0)
+        cropped_image_list = []
+        total_frames = len(out["out_list"])
+
+        for i in (range(total_frames)):
+            cropped_image = torch.clamp(out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
+            cropped_image_list.append(cropped_image)
+
+        cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
+      
+        return (cropped_out_tensors, out,)
+    
+class LivePortraitComposite:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+
+            "source_image": ("IMAGE",),
+            "cropped_image": ("IMAGE",),
+            "liveportrait_out": ("LP_OUT", ),
+            },
+            "optional": {
+                "mask": ("MASK", {"default": None}),
+            }
+        }
+
+    RETURN_TYPES = (
+        "IMAGE",
+        "MASK",
+    )
+    RETURN_NAMES = (
+        "full_images",
+        "mask",
+    )
+    FUNCTION = "process"
+    CATEGORY = "LivePortrait"
+
+    def process(self, source_image, cropped_image, liveportrait_out, mask=None):
+        mm.soft_empty_cache()
+
+        B, H, W, C = source_image.shape
+        source_image = source_image.permute(0, 3, 1, 2) # B,H,W,C -> B,C,H,W
+        cropped_image = cropped_image.permute(0, 3, 1, 2)
+
+        if mask is not None:
+            crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
+            print(crop_mask.shape)
+        else:
+            log.info("Using default mask template")
+            crop_mask = cv2.imread(os.path.join(script_directory, "liveportrait", "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
+            crop_mask = torch.from_numpy(crop_mask)
+            crop_mask = crop_mask.unsqueeze(0).float() / 255.0
+            print(crop_mask.shape)
+
+        crop_info = liveportrait_out["crop_info"]
+        composited_image_list = []
+        out_mask_list = []
+
+        total_frames = len(liveportrait_out["out_list"])
+        print(f"Total frames: {total_frames}")
+        print("crop_info_list: ", len(crop_info["crop_info_list"]))
+
+        pbar = comfy.utils.ProgressBar(total_frames)
+        for i in tqdm(range(total_frames), desc='Compositing..', total=total_frames):
+            safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
+            cropped_image = torch.clamp(liveportrait_out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
+
+            # Transform and blend             
+            cropped_image_to_original = _transform_img_kornia(
+                cropped_image,
+                crop_info["crop_info_list"][safe_index]["M_c2o"],
+                dsize=(W, H),
+                )
+
+            mask_ori = _transform_img_kornia(
+                crop_mask,
+                crop_info["crop_info_list"][safe_index]["M_c2o"],
+                dsize=(W, H),
+                )
+            
+            if liveportrait_out["mismatch_method"] == "cut":
+                source_frame = source_image[safe_index].unsqueeze(0).to(mask_ori.device)
+            else:
+                source_frame = _get_source_frame(source_image, i, liveportrait_out["mismatch_method"]).unsqueeze(0).to(mask_ori.device)
+                
+            cropped_image_to_original_blend = torch.clip(
+                    mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
+                    )
+
+            composited_image_list.append(cropped_image_to_original_blend)
+            out_mask_list.append(mask_ori)
+            pbar.update(1)
+
+        full_tensors_out = torch.cat(composited_image_list, dim=0)
         full_tensors_out = full_tensors_out.permute(0, 2, 3, 1)
 
         mask_tensors_out = torch.cat(out_mask_list, dim=0)
-        mask_tensors_out = mask_tensors_out[:, :, :, 0]
+        mask_tensors_out = mask_tensors_out[:, 0, :, :]
         
         return (
-            cropped_out_tensors.cpu().float(), 
             full_tensors_out.cpu().float(), 
             mask_tensors_out.cpu().float()
             )
+    
+def _get_source_frame(source, idx, method):
+        if source.shape[0] == 1:
+            return source[0]
+
+        if method == "constant":
+            return source[min(idx, source.shape[0] - 1)]
+        elif method == "cycle":
+            return source[idx % source.shape[0]]
+        elif method == "mirror":
+            cycle_length = 2 * source.shape[0] - 2
+            mirror_idx = idx % cycle_length
+            if mirror_idx >= source.shape[0]:
+                mirror_idx = cycle_length - mirror_idx
+            return source[mirror_idx]
 
 class LivePortraitLoadCropper:
     @classmethod
@@ -616,7 +708,8 @@ NODE_CLASS_MAPPINGS = {
     "LivePortraitRetargeting": LivePortraitRetargeting,
     #"KeypointScaler": KeypointScaler,
     "KeypointsToImage": KeypointsToImage,
-    "LivePortraitLoadCropper": LivePortraitLoadCropper
+    "LivePortraitLoadCropper": LivePortraitLoadCropper,
+    "LivePortraitComposite": LivePortraitComposite,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": "(Down)Load LivePortraitModels",
@@ -625,5 +718,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LivePortraitRetargeting": "LivePortraitRetargeting",
     #"KeypointScaler": "KeypointScaler",
     "KeypointsToImage": "LivePortrait KeypointsToImage",
-    "LivePortraitLoadCropper": "LivePortrait LoadCropper"
+    "LivePortraitLoadCropper": "LivePortrait LoadCropper",
+    "LivePortraitComposite": "LivePortrait Composite",
     }

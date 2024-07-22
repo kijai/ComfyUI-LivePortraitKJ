@@ -61,6 +61,7 @@ class LivePortraitPipeline(object):
         cropped_image_list = []
         composited_image_list = []
         out_mask_list = []
+        out_list = []
         R_d_0, x_d_0_info = None, None
 
         if mismatch_method == "cut" or relative_motion_mode == "source_video_smoothed":
@@ -266,38 +267,14 @@ class LivePortraitPipeline(object):
                 x_d_i_new = self.live_portrait_wrapper.stitching(x_s, x_d_i_new)
 
             out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
+            out_list.append(out)
     
-            cropped_image = torch.clamp(out["out"], 0, 1).permute(0, 2, 3, 1)
-           
-            cropped_image_list.append(cropped_image)
-
-            if mismatch_method == "cut" or inference_cfg.flag_eye_retargeting or inference_cfg.flag_lip_retargeting:
-                source_frame_rgb = source_np[safe_index]
-            else:
-                source_frame_rgb = self._get_source_frame(source_np, i, mismatch_method)
-        
-            # Transform and blend
-            if inference_cfg.flag_pasteback:                
-                cropped_image_to_original = _transform_img_kornia(
-                cropped_image,
-                crop_info["crop_info_list"][safe_index]["M_c2o"],
-                dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
-                )
-
-                mask_ori = _transform_img_kornia(
-                    inference_cfg.mask_crop,
-                    crop_info["crop_info_list"][safe_index]["M_c2o"],
-                    dsize=(source_frame_rgb.shape[1], source_frame_rgb.shape[0]),
-                    )
-
-                source_frame_torch = torch.from_numpy(source_frame_rgb).unsqueeze(0).permute(0, 3, 1, 2).to(mask_ori.device) / 255
-
-                cropped_image_to_original_blend = torch.clip(
-                     mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame_torch, 0, 1
-                     )
-
-            composited_image_list.append(cropped_image_to_original_blend)
-            out_mask_list.append(mask_ori)
             pbar.update(1)
 
-        return cropped_image_list, composited_image_list, out_mask_list
+        out_dict = {
+            "out_list": out_list,
+            "crop_info": crop_info,
+            "mismatch_method": mismatch_method,
+        }
+
+        return out_dict
