@@ -5,6 +5,8 @@ Pipeline of LivePortrait
 """
 
 import comfy.utils
+import comfy.model_management as mm
+import gc
 from tqdm import tqdm
 import numpy as np
 from .config.inference_config import InferenceConfig
@@ -35,23 +37,8 @@ class LivePortraitPipeline(object):
             cfg=inference_cfg,
         )
 
-    def _get_source_frame(self, source_np, idx, method):
-        if source_np.shape[0] == 1:
-            return source_np[0]
-
-        if method == "constant":
-            return source_np[min(idx, source_np.shape[0] - 1)]
-        elif method == "cycle":
-            return source_np[idx % source_np.shape[0]]
-        elif method == "mirror":
-            cycle_length = 2 * source_np.shape[0] - 2
-            mirror_idx = idx % cycle_length
-            if mirror_idx >= source_np.shape[0]:
-                mirror_idx = cycle_length - mirror_idx
-            return source_np[mirror_idx]
-
     def execute(
-        self, source_np, driving_images, crop_info, driving_landmarks, delta_multiplier, relative_motion_mode, driving_smooth_observation_variance, mismatch_method="constant", 
+        self, driving_images, crop_info, driving_landmarks, delta_multiplier, relative_motion_mode, driving_smooth_observation_variance, mismatch_method="constant", 
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
         device = inference_cfg.device_id
@@ -59,12 +46,15 @@ class LivePortraitPipeline(object):
         out_list = []
         R_d_0, x_d_0_info = None, None
 
+        source_images_num = len(crop_info["crop_info_list"])
+
         if mismatch_method == "cut" or relative_motion_mode == "source_video_smoothed":
-            total_frames = source_np.shape[0]
+            total_frames = source_images_num
         else:
             total_frames = driving_images.shape[0]
 
         
+
         disable_progress_bar = True if relative_motion_mode == "single_frame" else False
 
         source_info = crop_info["source_info"]
@@ -78,7 +68,7 @@ class LivePortraitPipeline(object):
         
         for i in tqdm(range(driving_images.shape[0]), desc='Processing driving images...', total=driving_images.shape[0], disable=disable_progress_bar):
             #get driving keypoints info
-            safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
+            safe_index = min(i, source_images_num - 1)
             if crop_info["crop_info_list"][safe_index] is None:
                 driving_info.append(None)
                 driving_rot_list.append(None)
@@ -102,7 +92,7 @@ class LivePortraitPipeline(object):
         if relative_motion_mode == "source_video_smoothed":
             x_d_r_lst = []
             first_driving_rot = driving_rot_list[0].cpu().numpy().astype(np.float32).transpose(0, 2, 1)
-            for i in tqdm(range(source_np.shape[0]), desc='Smoothing...', total=source_np.shape[0]):
+            for i in tqdm(range(source_images_num), desc='Smoothing...', total=source_images_num):
                 if driving_rot_list[i] is None:
                     x_d_r_lst.append(None)
                     continue
@@ -186,7 +176,7 @@ class LivePortraitPipeline(object):
                 not inference_cfg.flag_stitching
                 and not inference_cfg.flag_eye_retargeting
                 and not inference_cfg.flag_lip_retargeting
-            ):
+                ):
                 # without stitching or retargeting
                 if inference_cfg.flag_lip_zero:
                     x_d_i_new += lip_delta_before_animation.reshape(-1, x_s.shape[1], 3)
@@ -196,7 +186,7 @@ class LivePortraitPipeline(object):
                 inference_cfg.flag_stitching
                 and not inference_cfg.flag_eye_retargeting
                 and not inference_cfg.flag_lip_retargeting
-            ):
+                ):
                 # with stitching and without retargeting
                 if inference_cfg.flag_lip_zero:
                     x_d_i_new = self.live_portrait_wrapper.stitching(
@@ -204,6 +194,8 @@ class LivePortraitPipeline(object):
                     ) + lip_delta_before_animation.reshape(-1, x_s.shape[1], 3)
                 else:
                     x_d_i_new = self.live_portrait_wrapper.stitching(x_s, x_d_i_new)
+
+            #with eye/lip retargeting
             else:
                 eyes_delta, lip_delta = None, None
                 if inference_cfg.flag_eye_retargeting:
@@ -237,7 +229,7 @@ class LivePortraitPipeline(object):
                         x_s, combined_lip_ratio_tensor
                     )
 
-                if inference_cfg.flag_relative:  # use x_s
+                if relative_motion_mode != "off":  # use x_s
                     x_d_i_new = (
                         x_s
                         + (
@@ -273,6 +265,7 @@ class LivePortraitPipeline(object):
                 x_d_i_new = self.live_portrait_wrapper.stitching(x_s, x_d_i_new)
 
             out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
+            
             out_list.append(out)
     
             pbar.update(1)

@@ -44,8 +44,7 @@ class LandmarkRunner(object):
 
     def run(self, img_rgb: np.ndarray, lmk=None):
         if lmk is not None:
-            crop_dct = crop_image(img_rgb, lmk, dsize=self.dsize, scale=1.5, vy_ratio=-0.1)
-            img_crop_rgb = crop_dct['img_crop']
+            crop_dct, img_crop_rgb = crop_image(img_rgb, lmk, dsize=self.dsize, scale=1.5, vy_ratio=-0.1)
         else:
             img_crop_rgb = cv2.resize(img_rgb, (self.dsize, self.dsize))
             scale = max(img_rgb.shape[:2]) / self.dsize
@@ -64,7 +63,7 @@ class LandmarkRunner(object):
 
         pts = to_ndarray(out_pts[0]).reshape(-1, 2) * self.dsize  # scale to 0-224
         pts = _transform_pts(pts, M=crop_dct['M_c2o'])
-
+        del crop_dct, img_crop_rgb
         return {
             'pts': pts,  # 2d landmarks 203 points
         }

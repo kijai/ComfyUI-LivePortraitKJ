@@ -7,6 +7,7 @@ import comfy.utils
 import numpy as np
 import cv2
 from tqdm import tqdm
+import gc
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -37,10 +38,8 @@ class InferenceConfig:
         flag_eye_retargeting=False,
         flag_lip_retargeting=False,
         flag_stitching=True,
-        flag_relative=True,
         input_shape=(256, 256),
         device_id=0,
-        flag_do_crop=True,
         flag_do_rot=True,
     ):
         self.flag_use_half_precision = flag_use_half_precision
@@ -49,10 +48,8 @@ class InferenceConfig:
         self.flag_eye_retargeting = flag_eye_retargeting
         self.flag_lip_retargeting = flag_lip_retargeting
         self.flag_stitching = flag_stitching
-        self.flag_relative = flag_relative
         self.input_shape = input_shape
         self.device_id = device_id
-        self.flag_do_crop = flag_do_crop
         self.flag_do_rot = flag_do_rot
         
 class DownloadAndLoadLivePortraitModels:
@@ -187,22 +184,19 @@ class DownloadAndLoadLivePortraitModels:
         stitcher_checkpoint = filter_checkpoint_for_model(checkpoint, stitcher_prefix)
         stitcher = StitchingRetargetingNetwork(**config.get("stitching"))
         stitcher.load_state_dict(stitcher_checkpoint)
-        stitcher = stitcher.to(device)
-        stitcher.eval()
+        stitcher = stitcher.to(device).eval()
 
         lip_prefix = "retarget_mouth"
         lip_checkpoint = filter_checkpoint_for_model(checkpoint, lip_prefix)
         retargetor_lip = StitchingRetargetingNetwork(**config.get("lip"))
         retargetor_lip.load_state_dict(lip_checkpoint)
-        retargetor_lip = retargetor_lip.to(device)
-        retargetor_lip.eval()
+        retargetor_lip = retargetor_lip.to(device).eval()
 
         eye_prefix = "retarget_eye"
         eye_checkpoint = filter_checkpoint_for_model(checkpoint, eye_prefix)
         retargetor_eye = StitchingRetargetingNetwork(**config.get("eye"))
         retargetor_eye.load_state_dict(eye_checkpoint)
-        retargetor_eye = retargetor_eye.to(device)
-        retargetor_eye.eval()
+        retargetor_eye = retargetor_eye.to(device).eval()
         log.info("Load stitching_retargeting_module done.")
 
         self.stich_retargeting_module = {
@@ -294,7 +288,6 @@ class LivePortraitProcess:
     ):
         if driving_images.shape[0] < source_image.shape[0]:
             raise ValueError("The number of driving images should be larger than the number of source images.")
-        source_np = (source_image * 255).byte().numpy()
         
         if opt_retargeting_info is not None:
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = opt_retargeting_info["eye_retargeting"]
@@ -313,11 +306,6 @@ class LivePortraitProcess:
         pipeline.live_portrait_wrapper.cfg.flag_lip_zero = lip_zero
         pipeline.live_portrait_wrapper.cfg.lip_zero_threshold = lip_zero_threshold
 
-        if relative_motion_mode != "off":
-            pipeline.live_portrait_wrapper.cfg.flag_relative = True
-        else:
-            pipeline.live_portrait_wrapper.cfg.flag_relative = False
-
         if lip_zero and opt_retargeting_info is not None:
             log.warning("Warning: lip_zero only has an effect with lip or eye retargeting")
         
@@ -330,7 +318,6 @@ class LivePortraitProcess:
             driving_images_256 = driving_images_256.to(torch.float16)
 
         out = pipeline.execute(
-            source_np, 
             driving_images_256, 
             crop_info, 
             driving_landmarks,
@@ -384,6 +371,7 @@ class LivePortraitComposite:
 
     def process(self, source_image, cropped_image, liveportrait_out, mask=None):
         mm.soft_empty_cache()
+        gc.collect()
         device = mm.get_torch_device()
         if mm.is_device_mps(device): 
             device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
@@ -418,7 +406,7 @@ class LivePortraitComposite:
 
             if not liveportrait_out["out_list"][i]:
                 composited_image_list.append(source_frame)
-                out_mask_list.append(torch.zeros((1, 3, H, W), device=device))
+                out_mask_list.append(torch.zeros((1, 3, H, W), device="cpu"))
             else:
                 cropped_image = torch.clamp(liveportrait_out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
 
@@ -441,8 +429,8 @@ class LivePortraitComposite:
                         mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
                         )
 
-                composited_image_list.append(cropped_image_to_original_blend)
-                out_mask_list.append(mask_ori)
+                composited_image_list.append(cropped_image_to_original_blend.cpu())
+                out_mask_list.append(mask_ori.cpu())
             pbar.update(1)
 
         full_tensors_out = torch.cat(composited_image_list, dim=0)
@@ -452,8 +440,8 @@ class LivePortraitComposite:
         mask_tensors_out = mask_tensors_out[:, 0, :, :]
         
         return (
-            full_tensors_out.cpu().float(), 
-            mask_tensors_out.cpu().float()
+            full_tensors_out.float(), 
+            mask_tensors_out.float()
             )
     
 def _get_source_frame(source, idx, method):
@@ -548,16 +536,15 @@ class LivePortraitCropper:
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting, cropping, and processing..', total=len(source_image_np)):
             # Cropping operation
-            crop_info = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
+            crop_info, cropped_image_256 = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
             
             # Processing source images
             if crop_info:
                 crop_info_list.append(crop_info)
 
-                cropped_image = crop_info['img_crop_256x256']
-                cropped_images_list.append(cropped_image)
+                cropped_images_list.append(cropped_image_256)
 
-                I_s = pipeline.live_portrait_wrapper.prepare_source(cropped_image)
+                I_s = pipeline.live_portrait_wrapper.prepare_source(cropped_image_256)
 
                 x_s_info = pipeline.live_portrait_wrapper.get_kp_info(I_s)
                 source_info.append(x_s_info)
@@ -570,10 +557,12 @@ class LivePortraitCropper:
 
                 f_s = pipeline.live_portrait_wrapper.extract_feature_3d(I_s)
                 f_s_list.append(f_s)
+
+                del I_s
                 
             else:
-                log.warning(f"Warning: No face detected on frame {str(i)}, skipping")
-                cropped_image = np.zeros((256, 256, 3), dtype=np.uint8)
+                log.warning(f"Warning: No face detected on frame {str(i)}, skipping") 
+                cropped_images_list.append(np.zeros((256, 256, 3), dtype=np.uint8))
                 crop_info_list.append(None)
                 f_s_list.append(None)
                 x_s_list.append(None)

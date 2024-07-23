@@ -38,5 +38,4 @@ class InferenceConfig(PrintableConfig):
     flag_write_gif: bool = False
 
     device_id: int = 0
-    flag_do_crop: bool = False  # whether to crop the reference portrait to the face-cropping space
     flag_do_rot: bool = True  # whether to conduct the rotation when flag_do_crop is True

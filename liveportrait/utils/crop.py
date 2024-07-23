@@ -449,11 +449,10 @@ def crop_image(img, pts: np.ndarray, **kwargs):
     ret_dct = {
         'M_o2c': M_o2c,  # from the original image to the cropped image 3x3
         'M_c2o': M_c2o,  # from the cropped image to the original image 3x3
-        'img_crop': img_crop,  # the cropped image
         'pt_crop': pt_crop,  # the landmarks of the cropped image
     }
 
-    return ret_dct
+    return ret_dct, img_crop
 
 def average_bbox_lst(bbox_lst):
     if len(bbox_lst) == 0:

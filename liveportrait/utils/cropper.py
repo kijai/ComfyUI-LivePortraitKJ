@@ -62,7 +62,7 @@ class Cropper(object):
         pts = src_face.landmark_2d_106
        
         # crop the face
-        ret_dct = crop_image(
+        ret_dct, image_crop = crop_image(
             img_rgb,  # ndarray
             pts,  # 106x2 or Nx2
             dsize=dsize,
@@ -72,7 +72,7 @@ class Cropper(object):
             rotate=rotate
         )
         # update a 256x256 version for network input or else
-        ret_dct['img_crop_256x256'] = cv2.resize(ret_dct['img_crop'], (256, 256), interpolation=cv2.INTER_AREA)
+        cropped_image_256 = cv2.resize(image_crop, (256, 256), interpolation=cv2.INTER_AREA)
         ret_dct['pt_crop_256x256'] = ret_dct['pt_crop'] * 256 / dsize
 
         input_image_size = img_rgb.shape[:2]
@@ -82,4 +82,4 @@ class Cropper(object):
         lmk = recon_ret['pts']
         ret_dct['lmk_crop'] = lmk
 
-        return ret_dct
+        return ret_dct, cropped_image_256
