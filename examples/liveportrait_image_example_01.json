@@ -1,6 +1,6 @@
 {
-  "last_node_id": 196,
-  "last_link_id": 466,
+  "last_node_id": 197,
+  "last_link_id": 472,
   "nodes": [
     {
       "id": 129,
@@ -21,8 +21,8 @@
           "name": "cropper",
           "type": "LPCROPPER",
           "links": [
-            403,
-            444
+            444,
+            468
           ],
           "shape": 3,
           "slot_index": 0
@@ -87,9 +87,9 @@
           "name": "image",
           "type": "IMAGE",
           "links": [
-            437,
             443,
-            451
+            451,
+            469
           ],
           "shape": 3,
           "slot_index": 0
@@ -135,7 +135,7 @@
         {
           "name": "image",
           "type": "IMAGE",
-          "link": 402
+          "link": 471
         }
       ],
       "outputs": [
@@ -147,19 +147,19 @@
           "slot_index": 0
         },
         {
-          "name": "256 width",
+          "name": "width",
           "type": "INT",
           "links": null,
           "shape": 3
         },
         {
-          "name": "256 height",
+          "name": "height",
           "type": "INT",
           "links": null,
           "shape": 3
         },
         {
-          "name": "128 count",
+          "name": "count",
           "type": "INT",
           "links": null,
           "shape": 3
@@ -168,112 +168,6 @@
       "properties": {
         "Node name for S&R": "GetImageSizeAndCount"
       }
-    },
-    {
-      "id": 174,
-      "type": "LivePortraitCropper",
-      "pos": [
-        -636,
-        187
-      ],
-      "size": {
-        "0": 330,
-        "1": 246
-      },
-      "flags": {},
-      "order": 13,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "cropper",
-          "type": "LPCROPPER",
-          "link": 403,
-          "slot_index": 0
-        },
-        {
-          "name": "source_image",
-          "type": "IMAGE",
-          "link": 437
-        },
-        {
-          "name": "source_image",
-          "type": "IMAGE",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "cropped_image",
-          "type": "IMAGE",
-          "links": [
-            402
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "crop_info",
-          "type": "CROPINFO",
-          "links": [
-            426
-          ],
-          "shape": 3,
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitCropper"
-      },
-      "widgets_values": [
-        512,
-        2.3,
-        0,
-        -0.125,
-        0,
-        "large-small",
-        true
-      ]
-    },
-    {
-      "id": 180,
-      "type": "LivePortraitRetargeting",
-      "pos": [
-        -320,
-        -311
-      ],
-      "size": {
-        "0": 430.8000183105469,
-        "1": 130
-      },
-      "flags": {},
-      "order": 17,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "driving_crop_info",
-          "type": "CROPINFO",
-          "link": 426,
-          "slot_index": 0
-        }
-      ],
-      "outputs": [
-        {
-          "name": "retargeting_info",
-          "type": "RETARGETINGINFO",
-          "links": [],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitRetargeting"
-      },
-      "widgets_values": [
-        true,
-        1,
-        true,
-        1
-      ]
     },
     {
       "id": 188,
@@ -473,7 +367,8 @@
           "type": "LIVEPORTRAITPIPE",
           "links": [
             446,
-            448
+            448,
+            472
           ],
           "shape": 3,
           "slot_index": 0
@@ -977,10 +872,10 @@
         -1256,
         -572
       ],
-      "size": [
-        315,
-        314
-      ],
+      "size": {
+        "0": 315,
+        "1": 314
+      },
       "flags": {},
       "order": 6,
       "mode": 0,
@@ -1007,6 +902,182 @@
       "widgets_values": [
         "oldman.jpg",
         "image"
+      ]
+    },
+    {
+      "id": 168,
+      "type": "VHS_VideoCombine",
+      "pos": [
+        1495,
+        -143
+      ],
+      "size": [
+        1103.3974609375,
+        865.69873046875
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 441
+        },
+        {
+          "name": "audio",
+          "type": "VHS_AUDIO",
+          "link": null
+        },
+        {
+          "name": "meta_batch",
+          "type": "VHS_BatchManager",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Filenames",
+          "type": "VHS_FILENAMES",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VHS_VideoCombine"
+      },
+      "widgets_values": {
+        "frame_rate": 24,
+        "loop_count": 0,
+        "filename_prefix": "LivePortrait",
+        "format": "video/h264-mp4",
+        "pix_fmt": "yuv420p",
+        "crf": 19,
+        "save_metadata": true,
+        "pingpong": false,
+        "save_output": false,
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "LivePortrait_00002.mp4",
+            "subfolder": "",
+            "type": "temp",
+            "format": "video/h264-mp4",
+            "frame_rate": 24
+          }
+        }
+      }
+    },
+    {
+      "id": 180,
+      "type": "LivePortraitRetargeting",
+      "pos": [
+        -320,
+        -311
+      ],
+      "size": {
+        "0": 430.8000183105469,
+        "1": 130
+      },
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "driving_crop_info",
+          "type": "CROPINFO",
+          "link": 470,
+          "slot_index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "name": "retargeting_info",
+          "type": "RETARGETINGINFO",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitRetargeting"
+      },
+      "widgets_values": [
+        true,
+        1,
+        true,
+        1
+      ]
+    },
+    {
+      "id": 197,
+      "type": "LivePortraitCropper",
+      "pos": [
+        -636,
+        187
+      ],
+      "size": {
+        "0": 330,
+        "1": 242
+      },
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pipeline",
+          "type": "LIVEPORTRAITPIPE",
+          "link": 472,
+          "slot_index": 0
+        },
+        {
+          "name": "cropper",
+          "type": "LPCROPPER",
+          "link": 468
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 469
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cropped_image",
+          "type": "IMAGE",
+          "links": [
+            471
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "crop_info",
+          "type": "CROPINFO",
+          "links": [
+            470
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitCropper"
+      },
+      "widgets_values": [
+        512,
+        2.3,
+        0,
+        -0.125,
+        0,
+        "large-small",
+        true
       ]
     },
     {
@@ -1082,76 +1153,6 @@
         "relative",
         0.000003
       ]
-    },
-    {
-      "id": 168,
-      "type": "VHS_VideoCombine",
-      "pos": [
-        1495,
-        -143
-      ],
-      "size": [
-        1103.3974609375,
-        865.69873046875
-      ],
-      "flags": {},
-      "order": 22,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 441
-        },
-        {
-          "name": "audio",
-          "type": "VHS_AUDIO",
-          "link": null
-        },
-        {
-          "name": "meta_batch",
-          "type": "VHS_BatchManager",
-          "link": null
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "Filenames",
-          "type": "VHS_FILENAMES",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "VHS_VideoCombine"
-      },
-      "widgets_values": {
-        "frame_rate": 24,
-        "loop_count": 0,
-        "filename_prefix": "LivePortrait",
-        "format": "video/h264-mp4",
-        "pix_fmt": "yuv420p",
-        "crf": 19,
-        "save_metadata": true,
-        "pingpong": false,
-        "save_output": false,
-        "videopreview": {
-          "hidden": false,
-          "paused": false,
-          "params": {
-            "filename": "LivePortrait_00001.mp4",
-            "subfolder": "",
-            "type": "temp",
-            "format": "video/h264-mp4",
-            "frame_rate": 24
-          }
-        }
-      }
     }
   ],
   "links": [
@@ -1180,30 +1181,6 @@
       "INT"
     ],
     [
-      402,
-      174,
-      0,
-      134,
-      0,
-      "IMAGE"
-    ],
-    [
-      403,
-      129,
-      0,
-      174,
-      0,
-      "LPCROPPER"
-    ],
-    [
-      426,
-      174,
-      1,
-      180,
-      0,
-      "CROPINFO"
-    ],
-    [
       434,
       165,
       0,
@@ -1217,14 +1194,6 @@
       0,
       182,
       0,
-      "IMAGE"
-    ],
-    [
-      437,
-      182,
-      0,
-      174,
-      1,
       "IMAGE"
     ],
     [
@@ -1362,16 +1331,56 @@
       165,
       0,
       "IMAGE"
+    ],
+    [
+      468,
+      129,
+      0,
+      197,
+      1,
+      "LPCROPPER"
+    ],
+    [
+      469,
+      182,
+      0,
+      197,
+      2,
+      "IMAGE"
+    ],
+    [
+      470,
+      197,
+      1,
+      180,
+      0,
+      "CROPINFO"
+    ],
+    [
+      471,
+      197,
+      0,
+      134,
+      0,
+      "IMAGE"
+    ],
+    [
+      472,
+      1,
+      0,
+      197,
+      0,
+      "LIVEPORTRAITPIPE"
     ]
   ],
   "groups": [],
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.5644739300537774,
+      "scale": 0.6209213230591553,
       "offset": {
-        "0": 1531.7385101344028,
-        "1": 1081.4586534396992
+        "0": 1452.6772352406037,
+        "1": 986.9216386951317
       }
     }
   },

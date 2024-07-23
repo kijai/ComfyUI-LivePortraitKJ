@@ -84,19 +84,19 @@ class DownloadAndLoadLivePortraitModels:
         if precision == 'auto':
             try:
                 if mm.is_device_mps(device):
-                    print("LivePortrait using fp32 for MPS")
+                    log.info("LivePortrait using fp32 for MPS")
                     dtype = 'fp32'
                 elif mm.should_use_fp16():
-                    print("LivePortrait using fp16")
+                    log.info("LivePortrait using fp16")
                     dtype = 'fp16'
                 else:
-                    print("LivePortrait using fp32")
+                    log.info("LivePortrait using fp32")
                     dtype = 'fp32'
             except:
                 raise AttributeError("ComfyUI version too old, can't autodetect properly. Set your dtypes manually.")
         else:
             dtype = precision
-            print(f"LivePortrait using {dtype}")
+            log.info(f"LivePortrait using {dtype}")
 
         pbar = comfy.utils.ProgressBar(3)
 
@@ -340,10 +340,8 @@ class LivePortraitProcess:
             mismatch_method
         )
 
-        
         total_frames = len(out["out_list"])
       
-
         if total_frames > 1:
             cropped_image_list = []
             for i in (range(total_frames)):
@@ -396,21 +394,18 @@ class LivePortraitComposite:
 
         if mask is not None:
             crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
-            print(crop_mask.shape)
         else:
             log.info("Using default mask template")
             crop_mask = cv2.imread(os.path.join(script_directory, "liveportrait", "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
             crop_mask = torch.from_numpy(crop_mask)
             crop_mask = crop_mask.unsqueeze(0).float() / 255.0
-            print(crop_mask.shape)
 
         crop_info = liveportrait_out["crop_info"]
         composited_image_list = []
         out_mask_list = []
 
         total_frames = len(liveportrait_out["out_list"])
-        print(f"Total frames: {total_frames}")
-        print("crop_info_list: ", len(crop_info["crop_info_list"]))
+        log.info(f"Total frames: {total_frames}")
 
         pbar = comfy.utils.ProgressBar(total_frames)
         for i in tqdm(range(total_frames), desc='Compositing..', total=total_frames):
@@ -555,29 +550,31 @@ class LivePortraitCropper:
             # Cropping operation
             crop_info = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
             
-            if crop_info:
-                cropped_image = crop_info['img_crop_256x256']
-                crop_info_list.append(crop_info)
-            else:
-                cropped_image = np.zeros((256, 256, 3), dtype=np.uint8)
-                crop_info_list.append(None)
-                log.warning(f"Warning: No face detected on frame {str(i)}, skipping")
-            cropped_images_list.append(cropped_image)
-            
             # Processing source images
             if crop_info:
+                crop_info_list.append(crop_info)
+
+                cropped_image = crop_info['img_crop_256x256']
+                cropped_images_list.append(cropped_image)
+
                 I_s = pipeline.live_portrait_wrapper.prepare_source(cropped_image)
+
                 x_s_info = pipeline.live_portrait_wrapper.get_kp_info(I_s)
-                f_s = pipeline.live_portrait_wrapper.extract_feature_3d(I_s)
-                f_s_list.append(f_s)
                 source_info.append(x_s_info)
-        
+
                 x_s = pipeline.live_portrait_wrapper.transform_keypoint(x_s_info)
                 x_s_list.append(x_s)
-        
+
                 R_s = get_rotation_matrix(x_s_info["pitch"], x_s_info["yaw"], x_s_info["roll"])
                 source_rot_list.append(R_s)
+
+                f_s = pipeline.live_portrait_wrapper.extract_feature_3d(I_s)
+                f_s_list.append(f_s)
+                
             else:
+                log.warning(f"Warning: No face detected on frame {str(i)}, skipping")
+                cropped_image = np.zeros((256, 256, 3), dtype=np.uint8)
+                crop_info_list.append(None)
                 f_s_list.append(None)
                 x_s_list.append(None)
                 source_info.append(None)

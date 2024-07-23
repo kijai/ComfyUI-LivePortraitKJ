@@ -1,6 +1,6 @@
 {
-  "last_node_id": 202,
-  "last_link_id": 476,
+  "last_node_id": 203,
+  "last_link_id": 477,
   "nodes": [
     {
       "id": 129,
@@ -153,10 +153,10 @@
         -1050,
         -550
       ],
-      "size": [
-        315,
-        314
-      ],
+      "size": {
+        "0": 315,
+        "1": 314
+      },
       "flags": {},
       "order": 2,
       "mode": 0,
@@ -186,60 +186,6 @@
       ]
     },
     {
-      "id": 199,
-      "type": "GetImageSizeAndCount",
-      "pos": [
-        202,
-        -239
-      ],
-      "size": {
-        "0": 210,
-        "1": 86
-      },
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 474
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            472
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "512 width",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        },
-        {
-          "name": "512 height",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        },
-        {
-          "name": "1 count",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "GetImageSizeAndCount"
-      }
-    },
-    {
       "id": 78,
       "type": "GetImageSizeAndCount",
       "pos": [
@@ -251,7 +197,7 @@
         "1": 86
       },
       "flags": {},
-      "order": 7,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
@@ -295,6 +241,140 @@
       }
     },
     {
+      "id": 190,
+      "type": "LivePortraitProcess",
+      "pos": [
+        563,
+        -418
+      ],
+      "size": {
+        "0": 430.8000183105469,
+        "1": 282
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pipeline",
+          "type": "LIVEPORTRAITPIPE",
+          "link": 448
+        },
+        {
+          "name": "crop_info",
+          "type": "CROPINFO",
+          "link": 449
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 475
+        },
+        {
+          "name": "driving_images",
+          "type": "IMAGE",
+          "link": 477
+        },
+        {
+          "name": "opt_retargeting_info",
+          "type": "RETARGETINGINFO",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cropped_image",
+          "type": "IMAGE",
+          "links": [
+            470
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "output",
+          "type": "LP_OUT",
+          "links": [],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitProcess"
+      },
+      "widgets_values": [
+        false,
+        0.03,
+        false,
+        1,
+        "constant",
+        "single_frame",
+        0.000003
+      ]
+    },
+    {
+      "id": 198,
+      "type": "PreviewImage",
+      "pos": [
+        1027,
+        -409
+      ],
+      "size": {
+        "0": 521.2196044921875,
+        "1": 566.1187133789062
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 470
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 203,
+      "type": "Screencap_mss",
+      "pos": [
+        5,
+        -277
+      ],
+      "size": {
+        "0": 315,
+        "1": 178
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            477
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Screencap_mss"
+      },
+      "widgets_values": [
+        0,
+        0,
+        512,
+        512,
+        1,
+        0.1
+      ]
+    },
+    {
       "id": 189,
       "type": "LivePortraitCropper",
       "pos": [
@@ -306,7 +386,7 @@
         "1": 242
       },
       "flags": {},
-      "order": 8,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -354,168 +434,8 @@
         -0.125,
         0,
         "large-small",
-        true
+        false
       ]
-    },
-    {
-      "id": 202,
-      "type": "PreviewImage",
-      "pos": [
-        147.3814710186748,
-        -76.18841642883467
-      ],
-      "size": {
-        "0": 521.2196044921875,
-        "1": 566.1187133789062
-      },
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 476
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      }
-    },
-    {
-      "id": 201,
-      "type": "ImageGrabPIL",
-      "pos": [
-        -208,
-        -232
-      ],
-      "size": {
-        "0": 315,
-        "1": 178
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            474,
-            476
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ImageGrabPIL"
-      },
-      "widgets_values": [
-        0,
-        0,
-        512,
-        512,
-        1,
-        0.1
-      ]
-    },
-    {
-      "id": 190,
-      "type": "LivePortraitProcess",
-      "pos": [
-        563,
-        -418
-      ],
-      "size": {
-        "0": 430.8000183105469,
-        "1": 282
-      },
-      "flags": {},
-      "order": 9,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "pipeline",
-          "type": "LIVEPORTRAITPIPE",
-          "link": 448
-        },
-        {
-          "name": "crop_info",
-          "type": "CROPINFO",
-          "link": 449
-        },
-        {
-          "name": "source_image",
-          "type": "IMAGE",
-          "link": 475
-        },
-        {
-          "name": "driving_images",
-          "type": "IMAGE",
-          "link": 472
-        },
-        {
-          "name": "opt_retargeting_info",
-          "type": "RETARGETINGINFO",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "cropped_image",
-          "type": "IMAGE",
-          "links": [
-            470
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "output",
-          "type": "LP_OUT",
-          "links": [],
-          "shape": 3,
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitProcess"
-      },
-      "widgets_values": [
-        false,
-        0.03,
-        false,
-        1,
-        "constant",
-        "single_frame",
-        0.000003
-      ]
-    },
-    {
-      "id": 198,
-      "type": "PreviewImage",
-      "pos": [
-        1027,
-        -409
-      ],
-      "size": [
-        521.2195999999999,
-        566.1186964538573
-      ],
-      "flags": {},
-      "order": 10,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 470
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "PreviewImage"
-      }
     }
   ],
   "links": [
@@ -584,22 +504,6 @@
       "IMAGE"
     ],
     [
-      472,
-      199,
-      0,
-      190,
-      3,
-      "IMAGE"
-    ],
-    [
-      474,
-      201,
-      0,
-      199,
-      0,
-      "IMAGE"
-    ],
-    [
       475,
       78,
       0,
@@ -608,11 +512,11 @@
       "IMAGE"
     ],
     [
-      476,
-      201,
+      477,
+      203,
       0,
-      202,
-      0,
+      190,
+      3,
       "IMAGE"
     ]
   ],
@@ -622,8 +526,8 @@
     "ds": {
       "scale": 0.7513148009015781,
       "offset": {
-        "0": 1419.6048777240007,
-        "1": 976.38813725403
+        "0": 1170.2642381365986,
+        "1": 992.3601372540302
       }
     }
   },
