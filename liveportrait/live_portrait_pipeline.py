@@ -115,8 +115,9 @@ class LivePortraitPipeline(object):
             driving_rot_list_smooth = smooth(x_d_r_lst, source_rot_list[0].shape, device, observation_variance=driving_smooth_observation_variance)
 
         pbar = comfy.utils.ProgressBar(total_frames)
-
+       
         for i in tqdm(range(total_frames), desc='Animating...', total=total_frames, disable=disable_progress_bar):
+            
 
             safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
 
@@ -272,10 +273,13 @@ class LivePortraitPipeline(object):
             if inference_cfg.flag_stitching:
                 x_d_i_new = self.live_portrait_wrapper.stitching(x_s, x_d_i_new)
 
-            out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
+            out = self.live_portrait_wrapper.warp_decode_tensorrt(f_s, x_s, x_d_i_new)
+            #out = self.live_portrait_wrapper.warp_decode(f_s, x_s, x_d_i_new)
+        
             out_list.append(out)
     
             pbar.update(1)
+
 
         out_dict = {
             "out_list": out_list,

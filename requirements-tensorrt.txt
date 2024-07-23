@@ -1,0 +1,8 @@
+pyyaml
+numpy
+opencv-python
+onnxruntime-gpu
+pykalman
+tensorrt
+pycuda
+ctypes

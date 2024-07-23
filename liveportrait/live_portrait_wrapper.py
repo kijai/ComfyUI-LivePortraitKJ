@@ -15,6 +15,8 @@ from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 from .config.inference_config import InferenceConfig
 from contextlib import nullcontext
 
+from .efficient import EfficientLivePortraitPredictor
+
 from comfy.model_management import get_autocast_device
 
 class LivePortraitWrapper(object):
@@ -31,6 +33,8 @@ class LivePortraitWrapper(object):
         self.cfg = cfg
         self.device_id = cfg.device_id
         self.timer = Timer()
+
+        self.predictor = EfficientLivePortraitPredictor(use_tensorrt = True, half = True)
 
     def prepare_source(self, img: np.ndarray) -> torch.Tensor:
         """ construct the input as standard
@@ -255,7 +259,23 @@ class LivePortraitWrapper(object):
                     ret_dct[k] = v.float()
 
         return ret_dct
-
+    
+    def warp_decode_tensorrt(self, feature_3d, kp_source, kp_driving):
+        inputs = {
+            'feature_3d': np.array(feature_3d.cpu()),
+            'kp_driving': np.array(kp_driving.cpu()),
+            'kp_source': np.array(kp_source.cpu())
+        }
+        generator = self.predictor.run_time(engine_name='generator', task='gw_session',
+                                            inputs_onnx=inputs, inputs_tensorrt=[feature_3d.cpu(), kp_driving.cpu(), kp_source.cpu()])
+        
+        out = np.transpose(generator[0], [0, 2, 3, 1])  # 1x3xHxW -> 1xHxWx3
+        out = np.clip(out, 0, 1)  # clip to 0~1
+        out = np.clip(out * 255, 0, 255).astype(np.uint8)  # 0~1 -> 0~255
+        out = torch.from_numpy(out).permute(0, 3, 1, 2) / 255
+        
+        return {'out': out}
+    
     def calc_retargeting_ratio(self, source_lmk, driving_lmk_lst):
         input_eye_ratio_lst = []
         input_lip_ratio_lst = []
