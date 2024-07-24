@@ -32,11 +32,6 @@ class LivePortraitWrapper(object):
         self.device_id = cfg.device_id
         self.timer = Timer()
 
-    def update_config(self, user_args):
-        for k, v in user_args.items():
-            if hasattr(self.cfg, k):
-                setattr(self.cfg, k, v)
-
     def prepare_source(self, img: np.ndarray) -> torch.Tensor:
         """ construct the input as standard
         img: HxWx3, uint8, 256x256
@@ -57,24 +52,6 @@ class LivePortraitWrapper(object):
         x = torch.from_numpy(x).permute(0, 3, 1, 2)  # 1xHxWx3 -> 1x3xHxW
         x = x.to(self.device_id)
         return x
-
-    def prepare_driving_videos(self, imgs) -> torch.Tensor:
-        """ construct the input as standard
-        imgs: NxBxHxWx3, uint8
-        """
-        if isinstance(imgs, list):
-            _imgs = np.array(imgs)[..., np.newaxis]  # TxHxWx3x1
-        elif isinstance(imgs, np.ndarray):
-            _imgs = imgs
-        else:
-            raise ValueError(f'imgs type error: {type(imgs)}')
-
-        y = _imgs.astype(np.float32) / 255.
-        y = np.clip(y, 0, 1)  # clip to 0~1
-        y = torch.from_numpy(y).permute(0, 4, 3, 1, 2)  # TxHxWx3x1 -> Tx1x3xHxW
-        y = y.to(self.device_id)
-
-        return y
 
     def extract_feature_3d(self, x: torch.Tensor) -> torch.Tensor:
         """ get the appearance feature of the image by F
@@ -193,35 +170,6 @@ class LivePortraitWrapper(object):
 
         return delta
 
-    def retarget_keypoints(self, frame_idx, num_keypoints, input_eye_ratios, input_lip_ratios, source_landmarks, portrait_wrapper, kp_source, driving_transformed_kp):
-        # TODO: GPT style, refactor it...
-        if self.cfg.flag_eye_retargeting:
-            print("Retargeting eye...")
-            # ∆_eyes,i = R_eyes(x_s; c_s,eyes, c_d,eyes,i)
-            eye_delta = compute_eye_delta(frame_idx, input_eye_ratios, source_landmarks, portrait_wrapper, kp_source)
-        else:
-            # α_eyes = 0
-            eye_delta = None
-
-        if self.cfg.flag_lip_retargeting:
-            print("Retargeting lip...")
-            # ∆_lip,i = R_lip(x_s; c_s,lip, c_d,lip,i)
-            lip_delta = compute_lip_delta(frame_idx, input_lip_ratios, source_landmarks, portrait_wrapper, kp_source)
-        else:
-            # α_lip = 0
-            lip_delta = None
-
-        if self.cfg.flag_relative:  # use x_s
-            new_driving_kp = kp_source + \
-                (eye_delta.reshape(-1, num_keypoints, 3) if eye_delta is not None else 0) + \
-                (lip_delta.reshape(-1, num_keypoints, 3) if lip_delta is not None else 0)
-        else:  # use x_d,i
-            new_driving_kp = driving_transformed_kp + \
-                (eye_delta.reshape(-1, num_keypoints, 3) if eye_delta is not None else 0) + \
-                (lip_delta.reshape(-1, num_keypoints, 3) if lip_delta is not None else 0)
-
-        return new_driving_kp
-
     def stitch(self, kp_source: torch.Tensor, kp_driving: torch.Tensor) -> torch.Tensor:
         """
         kp_source: BxNx3
@@ -264,7 +212,7 @@ class LivePortraitWrapper(object):
         kp_source: BxNx3
         kp_driving: BxNx3
         """
-        # The line 18 in Algorithm 1: D(W(f_s; x_s, x′_d,i)）
+        # The line 18 in Algorithm 1: D(W(f_s; x_s, x′_d,i)
         with torch.autocast(get_autocast_device(self.device_id), dtype=torch.float16) if self.cfg.flag_use_half_precision else nullcontext():
             # get decoder input
             ret_dct = self.warping_module(feature_3d, kp_source=kp_source, kp_driving=kp_driving)
@@ -272,22 +220,13 @@ class LivePortraitWrapper(object):
             ret_dct['out'] = self.spade_generator(feature=ret_dct['out'])
 
         # float the dict
-        if self.cfg.flag_use_half_precision:
-            for k, v in ret_dct.items():
-                if isinstance(v, torch.Tensor):
-                    ret_dct[k] = v.float()
+        for k, v in ret_dct.items():
+            if isinstance(v, torch.Tensor):
+                ret_dct[k] = v.cpu()
+                if self.cfg.flag_use_half_precision:
+                    ret_dct[k] = ret_dct[k].float()
 
         return ret_dct
-
-    def parse_output(self, out: torch.Tensor) -> np.ndarray:
-        """ construct the output as standard
-        return: 1xHxWx3, uint8
-        """
-        out = np.transpose(out.data.cpu().numpy(), [0, 2, 3, 1])  # 1x3xHxW -> 1xHxWx3
-        out = np.clip(out, 0, 1)  # clip to 0~1
-        out = np.clip(out * 255, 0, 255).astype(np.uint8)  # 0~1 -> 0~255
-
-        return out
 
     def calc_retargeting_ratio(self, source_lmk, driving_lmk_lst):
         input_eye_ratio_lst = []
@@ -301,17 +240,19 @@ class LivePortraitWrapper(object):
 
     def calc_combined_eye_ratio(self, input_eye_ratio, source_lmk):
         eye_close_ratio = calc_eye_close_ratio(source_lmk[None])
-        eye_close_ratio_tensor = torch.from_numpy(eye_close_ratio).float().to(self.device_id)
-        input_eye_ratio_tensor = torch.Tensor([input_eye_ratio[0][0]]).reshape(1, 1).to(self.device_id)
+        eye_close_ratios_tensor = torch.from_numpy(eye_close_ratio).float().to(self.device_id)
+        input_eye_ratio_array = np.array(input_eye_ratio[0][0]).reshape(1, 1)
+        input_eye_ratio_tensor = torch.from_numpy(input_eye_ratio_array).float().to(self.device_id)
         # [c_s,eyes, c_d,eyes,i]
-        combined_eye_ratio_tensor = torch.cat([eye_close_ratio_tensor, input_eye_ratio_tensor], dim=1)
-        return combined_eye_ratio_tensor
+        combined_eye_ratios_tensor = torch.cat([eye_close_ratios_tensor, input_eye_ratio_tensor], dim=1)
+        return combined_eye_ratios_tensor
 
     def calc_combined_lip_ratio(self, input_lip_ratio, source_lmk):
         lip_close_ratio = calc_lip_close_ratio(source_lmk[None])
         lip_close_ratio_tensor = torch.from_numpy(lip_close_ratio).float().to(self.device_id)
         # [c_s,lip, c_d,lip,i]
-        input_lip_ratio_tensor = torch.Tensor([input_lip_ratio[0]]).to(self.device_id)
+        input_lip_ratio_array = np.array([input_lip_ratio[0]])
+        input_lip_ratio_tensor = torch.from_numpy(input_lip_ratio_array).float().to(self.device_id)
         if input_lip_ratio_tensor.shape != [1, 1]:
             input_lip_ratio_tensor = input_lip_ratio_tensor.reshape(1, 1)
         combined_lip_ratio_tensor = torch.cat([lip_close_ratio_tensor, input_lip_ratio_tensor], dim=1)

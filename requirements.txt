@@ -1,5 +1,6 @@
 pyyaml
 numpy
 opencv-python
-rich
 onnxruntime-gpu
+pykalman
+mediapipe

@@ -158,7 +158,11 @@ class DownBlock3d(nn.Module):
         out = self.conv(x)
         out = self.norm(out)
         out = F.relu(out)
-        out = self.pool(out)
+        try:
+            out = self.pool(out)
+        except NotImplementedError:
+            out_device = out.device # Store input device
+            out = self.pool(out.to('cpu')).to(out_device)
         return out
 
 

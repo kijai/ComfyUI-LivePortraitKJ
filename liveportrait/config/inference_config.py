@@ -29,21 +29,13 @@ class InferenceConfig(PrintableConfig):
     flag_stitching: bool = True  # we recommend setting it to True!
 
     flag_relative: bool = True  # whether to use relative pose
-    anchor_frame: int = 0  # set this value if find_best_frame is True
 
     input_shape: Tuple[int, int] = (256, 256)  # input shape
     output_format: Literal['mp4', 'gif'] = 'mp4'  # output video format
     output_fps: int = 30  # fps for output video
     crf: int = 15  # crf for output video
 
-    flag_write_result: bool = True  # whether to write output video
-    flag_pasteback: bool = True  # whether to paste-back/stitch the animated face cropping from the face-cropping space to the original image space
-    mask_crop = None
     flag_write_gif: bool = False
-    size_gif: int = 256
-    ref_max_shape: int = 1280
-    ref_shape_n: int = 2
 
     device_id: int = 0
-    flag_do_crop: bool = False  # whether to crop the reference portrait to the face-cropping space
     flag_do_rot: bool = True  # whether to conduct the rotation when flag_do_crop is True

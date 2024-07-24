@@ -4,14 +4,12 @@
 cropping function and the related preprocess functions for cropping
 """
 
-import cv2; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False) # NOTE: enforce single thread
+import cv2#; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False) # NOTE: enforce single thread
 import numpy as np
-from .rprint import rprint as print
 from math import sin, cos, acos, degrees
-
 DTYPE = np.float32
 CV2_INTERP = cv2.INTER_LINEAR
-
+import comfy.model_management as mm
 
 def _transform_img(img, M, dsize, flags=CV2_INTERP, borderMode=None):
     """ conduct similarity or affine transformation to the image, do not do border operation!
@@ -29,6 +27,43 @@ def _transform_img(img, M, dsize, flags=CV2_INTERP, borderMode=None):
     else:
         return cv2.warpAffine(img, M[:2, :], dsize=_dsize, flags=flags)
 
+import torch
+import kornia.geometry.transform as KGT
+
+def _transform_img_kornia(img, M, dsize, device, flags='bilinear', borderMode='zeros'):
+    """Conduct similarity or affine transformation to the image using Kornia.
+    
+    img: Input image as a PyTorch tensor of shape (C, H, W).
+    M: 2x3 transformation matrix as a PyTorch tensor.
+    dsize: Target shape (width, height).
+    """
+   
+    # Convert dsize to tensor shape (H, W)
+    _dsize = torch.tensor([dsize[1], dsize[0]])  # Kornia expects (H, W)
+
+    # Convert M from numpy.ndarray to PyTorch tensor
+    M = torch.from_numpy(M).float().to(device)
+    if M.shape == (3, 3):
+        M = M[:2, :].unsqueeze(0)  # Adjust M to the expected shape Bx2x3
+    elif M.shape == (2, 3):
+        M = M.unsqueeze(0)  # Add batch dimension if not present
+
+    # Reshape M for Kornia (1, 2, 3) and upscale to 3D affine matrix if not already
+    if M.shape == (2, 3):
+        M = M.unsqueeze(0)  # Add batch dimension
+
+    # Convert image to floating point tensor if not already
+    if img.dtype != torch.float32:
+        img = img.float()
+    img = img.to(device)
+
+    # Reshape img for Kornia (B, C, H, W)
+    img = img.permute(0, 3, 1, 2)
+
+    # Apply the affine transformation
+    img_warped = KGT.warp_affine(img, M, _dsize, mode=flags, padding_mode=borderMode)
+
+    return img_warped
 
 def _transform_pts(pts, M):
     """ conduct similarity or affine transformation to the pts
@@ -38,6 +73,23 @@ def _transform_pts(pts, M):
     """
     return pts @ M[:2, :2].T + M[:2, 2]
 
+
+def parse_pt2_from_pt478(pt478, use_lip=True):
+    """
+    parsing the 2 points according to the 101 points, which cancels the roll
+    """
+    # the former version use the eye center, but it is not robust, now use interpolation
+    pt_left_eye = pt478[468]  # left eye center
+    pt_right_eye = pt478[473]  # right eye center
+
+    if use_lip:
+        # use lip
+        pt_center_eye = (pt_left_eye + pt_right_eye) / 2
+        pt_center_lip = pt478[14]
+        pt2 = np.stack([pt_center_eye, pt_center_lip], axis=0)
+    else:
+        pt2 = np.stack([pt_left_eye, pt_right_eye], axis=0)
+    return pt2
 
 def parse_pt2_from_pt101(pt101, use_lip=True):
     """
@@ -89,29 +141,60 @@ def parse_pt2_from_pt203(pt203, use_lip=True):
         pt2 = np.stack([pt_left_eye, pt_right_eye], axis=0)
     return pt2
 
+def parse_pt2_from_pt9(pt9, use_lip=True):
+    '''
+    animal_face = {"keypoints": ['right eye right', 'right eye left', 'left eye right', 'left eye left', 'nose tip', 'lip right', 'lip left', 'upper lip', 'lower lip'], "skeleton": []}
 
-def parse_pt2_from_pt68(pt68, use_lip=True):
-    """
-    parsing the 2 points according to the 68 points, which cancels the roll
-    """
-    lm_idx = np.array([31, 37, 40, 43, 46, 49, 55], dtype=np.int32) - 1
+
+    '''
     if use_lip:
-        pt5 = np.stack([
-            np.mean(pt68[lm_idx[[1, 2]], :], 0),  # left eye
-            np.mean(pt68[lm_idx[[3, 4]], :], 0),  # right eye
-            pt68[lm_idx[0], :],  # nose
-            pt68[lm_idx[5], :],  # lip
-            pt68[lm_idx[6], :]   # lip
+        pt9 = np.stack([
+            (pt9[2]+pt9[3])/2, # left eye
+            (pt9[0]+pt9[1])/2, # right eye
+            pt9[4],
+            # (pt9[5]+pt9[6]+pt9[7]+pt9[8])/4 # lip
+            (pt9[5] + pt9[6] ) / 2 # lip
         ], axis=0)
-
         pt2 = np.stack([
-            (pt5[0] + pt5[1]) / 2,
-            (pt5[3] + pt5[4]) / 2
+            (pt9[0] + pt9[1]) / 2, # eye
+            pt9[3] # lip
         ], axis=0)
     else:
         pt2 = np.stack([
-            np.mean(pt68[lm_idx[[1, 2]], :], 0),  # left eye
-            np.mean(pt68[lm_idx[[3, 4]], :], 0),  # right eye
+            (pt9[2] + pt9[3]) / 2,
+            (pt9[0] + pt9[1]) / 2,
+        ], axis=0)
+
+    return pt2
+
+def parse_pt2_from_pt68(pt68, use_lip=True):
+    '''
+face = {"keypoints": ['right cheekbone 1', 'right cheekbone 2', 'right cheek 1', 'right cheek 2', 'right cheek 3', 'right cheek 4', 'right cheek 5', 'right chin', 'chin center', 
+'left chin', 'left cheek 5', 'left cheek 4', 'left cheek 3', 'left cheek 2', 'left cheek 1', 'left cheekbone 2', 'left cheekbone 1', 'right eyebrow 1', 'right eyebrow 2', 'right eyebrow 3', 
+'right eyebrow 4', 'right eyebrow 5', 'left eyebrow 1', 'left eyebrow 2', 'left eyebrow 3', 'left eyebrow 4', 'left eyebrow 5', 'nasal bridge 1', 'nasal bridge 2', 'nasal bridge 3', 'nasal bridge 4', 
+'right nasal wing 1', 'right nasal wing 2', 'nasal wing center', 'left nasal wing 1', 'left nasal wing 2', 'right eye eye corner 1', 'right eye upper eyelid 1', 'right eye upper eyelid 2', 
+'right eye eye corner 2', 'right eye lower eyelid 2', 'right eye lower eyelid 1', 'left eye eye corner 1', 'left eye upper eyelid 1', 'left eye upper eyelid 2', 'left eye eye corner 2', 'left eye lower eyelid 2', 
+'left eye lower eyelid 1', 'right mouth corner', 'upper lip outer edge 1', 'upper lip outer edge 2', 'upper lip outer edge 3', 'upper lip outer edge 4', 'upper lip outer edge 5', 'left mouth corner', 
+'lower lip outer edge 5', 'lower lip outer edge 4', 'lower lip outer edge 3', 'lower lip outer edge 2', 'lower lip outer edge 1', 'upper lip inter edge 1', 'upper lip inter edge 2', 'upper lip inter edge 3', 
+'upper lip inter edge 4', 'upper lip inter edge 5', 'lower lip inter edge 3', 'lower lip inter edge 2', 'lower lip inter edge 1'], "skeleton": []}
+
+
+    '''
+    if use_lip:
+        pt68 = np.stack([
+            (pt68[42] + pt68[43] + pt68[44] + pt68[45] + pt68[46]+ pt68[47])/6, # left eye
+            (pt68[36] + pt68[37] + pt68[38] + pt68[39] + pt68[40] + pt68[41]) / 6,  # right eye
+            (pt68[48] + pt68[54])/2
+
+        ], axis=0)
+        pt2 = np.stack([
+            (pt68[0] + pt68[1]) / 2,
+            pt68[2]
+        ], axis=0)
+    else:
+        pt2 = np.stack([
+            (pt68[42] + pt68[43] + pt68[44] + pt68[45] + pt68[46] + pt68[47]) / 6,  # left eye
+            (pt68[36] + pt68[37] + pt68[38] + pt68[39] + pt68[40] + pt68[41]) / 6,  # right eye
         ], axis=0)
 
     return pt2
@@ -145,9 +228,13 @@ def parse_pt2_from_pt_x(pts, use_lip=True):
         pt2 = parse_pt2_from_pt5(pts, use_lip=use_lip)
     elif pts.shape[0] == 203:
         pt2 = parse_pt2_from_pt203(pts, use_lip=use_lip)
+    elif pts.shape[0] == 478:
+        pt2 = parse_pt2_from_pt478(pts, use_lip=use_lip)
     elif pts.shape[0] > 101:
         # take the first 101 points
         pt2 = parse_pt2_from_pt101(pts[:101], use_lip=use_lip)
+    elif pts.shape[0] == 9:
+        pt2 = parse_pt2_from_pt9(pts, use_lip=use_lip)
     else:
         raise Exception(f'Unknow shape: {pts.shape}')
 
@@ -350,13 +437,15 @@ def crop_image(img, pts: np.ndarray, **kwargs):
     dsize = kwargs.get('dsize', 224)
     scale = kwargs.get('scale', 1.5)  # 1.5 | 1.6
     vy_ratio = kwargs.get('vy_ratio', -0.1)  # -0.0625 | -0.1
+    vx_ratio = kwargs.get('vx_ratio', 0)
 
     M_INV, _ = _estimate_similar_transform_from_pts(
         pts,
         dsize=dsize,
         scale=scale,
         vy_ratio=vy_ratio,
-        flag_do_rot=kwargs.get('flag_do_rot', True),
+        vx_ratio=vx_ratio,
+        flag_do_rot=kwargs.get('rotate', True),
     )
 
     if img is None:
@@ -379,15 +468,13 @@ def crop_image(img, pts: np.ndarray, **kwargs):
     ret_dct = {
         'M_o2c': M_o2c,  # from the original image to the cropped image 3x3
         'M_c2o': M_c2o,  # from the cropped image to the original image 3x3
-        'img_crop': img_crop,  # the cropped image
         'pt_crop': pt_crop,  # the landmarks of the cropped image
     }
 
-    return ret_dct
+    return ret_dct, img_crop
 
 def average_bbox_lst(bbox_lst):
     if len(bbox_lst) == 0:
         return None
     bbox_arr = np.array(bbox_lst)
     return np.mean(bbox_arr, axis=0).tolist()
-

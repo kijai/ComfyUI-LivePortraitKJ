@@ -4,57 +4,14 @@
 utility functions and classes to handle feature extraction and model loading
 """
 
-import os
 import os.path as osp
 import cv2
 import torch
 from collections import OrderedDict
 
-def suffix(filename):
-    """a.jpg -> jpg"""
-    pos = filename.rfind(".")
-    if pos == -1:
-        return ""
-    return filename[pos + 1:]
-
-
-def prefix(filename):
-    """a.jpg -> a"""
-    pos = filename.rfind(".")
-    if pos == -1:
-        return filename
-    return filename[:pos]
-
-
-def basename(filename):
-    """a/b/c.jpg -> c"""
-    return prefix(osp.basename(filename))
-
-
-def is_video(file_path):
-    if file_path.lower().endswith((".mp4", ".mov", ".avi", ".webm")) or osp.isdir(file_path):
-        return True
-    return False
-
-def is_template(file_path):
-    if file_path.endswith(".pkl"):
-        return True
-    return False
-
-
-def mkdir(d, log=False):
-    # return self-assined `d`, for one line code
-    if not osp.exists(d):
-        os.makedirs(d, exist_ok=True)
-        if log:
-            print(f"Make dir: {d}")
-    return d
-
-
 def squeeze_tensor_to_numpy(tensor):
     out = tensor.data.squeeze(0).cpu().numpy()
     return out
-
 
 def dct2cuda(dct: dict, device_id: int):
     for key in dct:
@@ -94,11 +51,6 @@ def calculate_transformation(config, s_kp_info, t_0_kp_info, t_i_kp_info, R_s, R
     new_translation[..., 2].fill_(0)  # Keep the z-axis unchanged
     new_scale = s_kp_info['scale'] * (t_i_kp_info['scale'] / t_0_kp_info['scale'])
     return new_rotation, new_expression, new_translation, new_scale
-
-def load_description(fp):
-    with open(fp, 'r', encoding='utf-8') as f:
-        content = f.read()
-    return content
 
 
 def resize_to_limit(img, max_dim=1280, n=2):
