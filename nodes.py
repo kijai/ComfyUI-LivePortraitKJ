@@ -12,7 +12,15 @@ import gc
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
-from .liveportrait.utils.cropper import Cropper
+try:
+    from .liveportrait.utils.cropper import CropperMediaPipe
+except:
+    raise ModuleNotFoundError("Can't load MediaPipe, MediaPipeCropper not available")
+try:
+    from .liveportrait.utils.cropper import CropperInsightFace
+except:
+    raise ModuleNotFoundError("Can't load InsightFace, InsightFaceCropper not available")
+
 from .liveportrait.modules.spade_generator import SPADEDecoder
 from .liveportrait.modules.warping_network import WarpingNetwork
 from .liveportrait.modules.motion_extractor import MotionExtractor
@@ -405,7 +413,7 @@ class LivePortraitComposite:
                 source_frame = _get_source_frame(source_image, i, liveportrait_out["mismatch_method"]).unsqueeze(0).to(device)
 
             if not liveportrait_out["out_list"][i]:
-                composited_image_list.append(source_frame)
+                composited_image_list.append(source_frame.cpu())
                 out_mask_list.append(torch.zeros((1, 3, H, W), device="cpu"))
             else:
                 cropped_image = torch.clamp(liveportrait_out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
@@ -485,7 +493,37 @@ class LivePortraitLoadCropper:
         
         if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
             self.current_config = cropper_init_config
-            self.cropper = Cropper(**cropper_init_config)
+            self.cropper = CropperInsightFace(**cropper_init_config)
+
+        return (self.cropper,)
+
+class LivePortraitLoadMediaPipeCropper:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+
+            "landmarkrunner_onnx_device": (
+                    ['CPU', 'CUDA', 'ROCM', 'CoreML'], {
+                        "default": 'CPU'
+                    }),
+            "keep_model_loaded": ("BOOLEAN", {"default": True})
+            },           
+        }
+
+    RETURN_TYPES = ("LPCROPPER",)
+    RETURN_NAMES = ("cropper",)
+    FUNCTION = "crop"
+    CATEGORY = "LivePortrait"
+
+    def crop(self, landmarkrunner_onnx_device, keep_model_loaded):
+        cropper_init_config = {
+            'keep_model_loaded': keep_model_loaded,
+            'onnx_device': landmarkrunner_onnx_device
+        }
+        
+        if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
+            self.current_config = cropper_init_config
+            self.cropper = CropperMediaPipe(**cropper_init_config)
 
         return (self.cropper,)
     
@@ -522,7 +560,7 @@ class LivePortraitCropper:
     CATEGORY = "LivePortrait"
 
     def process(self, pipeline, cropper, source_image, dsize, scale, vx_ratio, vy_ratio, face_index, face_index_order, rotate):
-        source_image_np = (source_image * 255).byte().numpy()
+        source_image_np = (source_image.contiguous() * 255).byte().numpy()
 
         # Initialize lists
         crop_info_list = []
@@ -718,15 +756,17 @@ NODE_CLASS_MAPPINGS = {
     #"KeypointScaler": KeypointScaler,
     "KeypointsToImage": KeypointsToImage,
     "LivePortraitLoadCropper": LivePortraitLoadCropper,
+    "LivePortraitLoadMediaPipeCropper": LivePortraitLoadMediaPipeCropper,
     "LivePortraitComposite": LivePortraitComposite,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": "(Down)Load LivePortraitModels",
-    "LivePortraitProcess": "LivePortraitProcess",
-    "LivePortraitCropper": "LivePortraitCropper",
-    "LivePortraitRetargeting": "LivePortraitRetargeting",
+    "LivePortraitProcess": "LivePortrait Process",
+    "LivePortraitCropper": "LivePortrait Cropper",
+    "LivePortraitRetargeting": "LivePortrait Retargeting",
     #"KeypointScaler": "KeypointScaler",
     "KeypointsToImage": "LivePortrait KeypointsToImage",
-    "LivePortraitLoadCropper": "LivePortrait LoadCropper",
+    "LivePortraitLoadCropper": "LivePortrait Load InsightFaceCropper",
+    "LivePortraitLoadMediaPipeCropper": "LivePortrait Load MediaPipeCropper",
     "LivePortraitComposite": "LivePortrait Composite",
     }
