@@ -73,6 +73,8 @@ class LivePortraitPipeline(object):
                 driving_info.append(None)
                 driving_rot_list.append(None)
                 driving_exp_list.append(None)
+                if i == 0:
+                    raise ValueError("No face detected in FIRST source image")
                 continue
             x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
             
