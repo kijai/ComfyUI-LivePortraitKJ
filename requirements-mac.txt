@@ -1,0 +1,6 @@
+pyyaml
+numpy
+opencv-python
+onnxruntime
+pykalman
+mediapipe
