@@ -9,17 +9,21 @@ import cv2
 from tqdm import tqdm
 import gc
 
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log = logging.getLogger(__name__)
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
 try:
     from .liveportrait.utils.cropper import CropperMediaPipe
 except:
-    raise ModuleNotFoundError("Can't load MediaPipe, MediaPipeCropper not available")
+    log.warning("Can't load MediaPipe, MediaPipeCropper not available")
 try:
     from .liveportrait.utils.cropper import CropperInsightFace
 except:
-    raise ModuleNotFoundError("Can't load InsightFace, InsightFaceCropper not available")
+    log.warning("Can't load MediaPipe, MediaPipeCropper not available")
 
 from .liveportrait.modules.spade_generator import SPADEDecoder
 from .liveportrait.modules.warping_network import WarpingNetwork
@@ -33,9 +37,6 @@ from .liveportrait.modules.stitching_retargeting_network import (
 from .liveportrait.utils.camera import get_rotation_matrix
 from .liveportrait.utils.crop import _transform_img_kornia
 
-import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-log = logging.getLogger(__name__)
 
 class InferenceConfig:
     def __init__(
