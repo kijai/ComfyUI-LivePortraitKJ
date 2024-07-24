@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import cv2#; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
 
 from .landmark_runner import LandmarkRunner
-from .face_analysis_diy import FaceAnalysisDIY
+
 from .crop import crop_image
 
 import folder_paths
@@ -33,6 +33,7 @@ class CropperInsightFace(object):
         )
         self.landmark_runner.warmup()
 
+        from .face_analysis_diy import FaceAnalysisDIY
         self.face_analysis_wrapper = FaceAnalysisDIY(
             name='buffalo_l',
             root=os.path.join(folder_paths.models_dir, 'insightface'),
