@@ -5,7 +5,7 @@ from typing import List, Union, Tuple
 from dataclasses import dataclass, field
 import cv2#; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
 
-from .landmark_runner import LandmarkRunner
+from .landmark_runner import LandmarkRunner, LandmarkRunnerTorch
 
 from .crop import crop_image
 
@@ -85,12 +85,21 @@ class CropperMediaPipe(object):
     def __init__(self, **kwargs) -> None:
         device_id = kwargs.get('device_id', 0)
         provider = kwargs.get('onnx_device', 'CPU')
-        self.landmark_runner = LandmarkRunner(
-            ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark.onnx'),
-            onnx_provider=provider,
-            device_id=device_id
-        )
-        self.landmark_runner.warmup()
+
+        if provider != "torch_gpu":
+            self.landmark_runner = LandmarkRunner(
+                ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark.onnx'),
+                onnx_provider=provider,
+                device_id=device_id
+                )
+            self.landmark_runner.warmup()
+        else:
+            self.landmark_runner = LandmarkRunnerTorch(
+                    ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark_model.pth'),
+                    onnx_provider=provider,
+                    device_id=device_id
+                )
+        
         from ...media_pipe.mp_utils  import LMKExtractor
         self.lmk_extractor = LMKExtractor()
 

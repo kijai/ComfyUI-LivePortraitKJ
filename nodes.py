@@ -114,6 +114,7 @@ class DownloadAndLoadLivePortraitModels:
 
             snapshot_download(
                 repo_id="Kijai/LivePortrait_safetensors",
+                ignore_patterns="*landmark_model.pth*",
                 local_dir=download_path,
                 local_dir_use_symlinks=False,
             )
@@ -503,7 +504,7 @@ class LivePortraitLoadMediaPipeCropper:
         return {"required": {
 
             "landmarkrunner_onnx_device": (
-                    ['CPU', 'CUDA', 'ROCM', 'CoreML'], {
+                    ['CPU', 'CUDA', 'ROCM', 'CoreML', 'torch_gpu'], {
                         "default": 'CPU'
                     }),
             "keep_model_loaded": ("BOOLEAN", {"default": True})
