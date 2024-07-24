@@ -1,6 +1,6 @@
 {
-  "last_node_id": 197,
-  "last_link_id": 472,
+  "last_node_id": 200,
+  "last_link_id": 478,
   "nodes": [
     {
       "id": 129,
@@ -20,10 +20,7 @@
         {
           "name": "cropper",
           "type": "LPCROPPER",
-          "links": [
-            444,
-            468
-          ],
+          "links": [],
           "shape": 3,
           "slot_index": 0
         }
@@ -37,99 +34,18 @@
       ]
     },
     {
-      "id": 82,
-      "type": "MaskPreview+",
-      "pos": [
-        1380,
-        -820
-      ],
-      "size": {
-        "0": 210,
-        "1": 246
-      },
-      "flags": {},
-      "order": 10,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 187
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "MaskPreview+"
-      }
-    },
-    {
-      "id": 182,
-      "type": "GetImageSizeAndCount",
-      "pos": [
-        -831,
-        37
-      ],
-      "size": {
-        "0": 210,
-        "1": 86
-      },
-      "flags": {},
-      "order": 11,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 436
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            443,
-            451,
-            469
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "480 width",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        },
-        {
-          "name": "480 height",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        },
-        {
-          "name": "32 count",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "GetImageSizeAndCount"
-      }
-    },
-    {
       "id": 134,
       "type": "GetImageSizeAndCount",
       "pos": [
-        -193,
-        182
+        -200,
+        360
       ],
       "size": {
         "0": 210,
         "1": 86
       },
       "flags": {},
-      "order": 16,
+      "order": 19,
       "mode": 0,
       "inputs": [
         {
@@ -173,8 +89,8 @@
       "id": 188,
       "type": "Note",
       "pos": [
-        39,
-        137
+        30,
+        310
       ],
       "size": {
         "0": 229.1644287109375,
@@ -193,69 +109,6 @@
       "bgcolor": "#653"
     },
     {
-      "id": 189,
-      "type": "LivePortraitCropper",
-      "pos": [
-        -3,
-        -755
-      ],
-      "size": {
-        "0": 330,
-        "1": 242
-      },
-      "flags": {},
-      "order": 14,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "pipeline",
-          "type": "LIVEPORTRAITPIPE",
-          "link": 446,
-          "slot_index": 0
-        },
-        {
-          "name": "cropper",
-          "type": "LPCROPPER",
-          "link": 444
-        },
-        {
-          "name": "source_image",
-          "type": "IMAGE",
-          "link": 445
-        }
-      ],
-      "outputs": [
-        {
-          "name": "cropped_image",
-          "type": "IMAGE",
-          "links": null,
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "crop_info",
-          "type": "CROPINFO",
-          "links": [
-            449
-          ],
-          "shape": 3,
-          "slot_index": 1
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitCropper"
-      },
-      "widgets_values": [
-        512,
-        2.3,
-        0,
-        -0.125,
-        0,
-        "large-small",
-        true
-      ]
-    },
-    {
       "id": 78,
       "type": "GetImageSizeAndCount",
       "pos": [
@@ -267,7 +120,7 @@
         "1": 86
       },
       "flags": {},
-      "order": 12,
+      "order": 15,
       "mode": 0,
       "inputs": [
         {
@@ -311,77 +164,6 @@
       }
     },
     {
-      "id": 192,
-      "type": "Reroute",
-      "pos": [
-        423,
-        -466
-      ],
-      "size": [
-        82,
-        26
-      ],
-      "flags": {},
-      "order": 15,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "",
-          "type": "*",
-          "link": 455
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            456,
-            457
-          ],
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "showOutputText": true,
-        "horizontal": false
-      }
-    },
-    {
-      "id": 1,
-      "type": "DownloadAndLoadLivePortraitModels",
-      "pos": [
-        -1244,
-        -870
-      ],
-      "size": {
-        "0": 302.43463134765625,
-        "1": 58
-      },
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "live_portrait_pipe",
-          "type": "LIVEPORTRAITPIPE",
-          "links": [
-            446,
-            448,
-            472
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "DownloadAndLoadLivePortraitModels"
-      },
-      "widgets_values": [
-        "fp16"
-      ]
-    },
-    {
       "id": 8,
       "type": "VHS_LoadVideo",
       "pos": [
@@ -393,7 +175,7 @@
         572.1555480957031
       ],
       "flags": {},
-      "order": 8,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
@@ -453,7 +235,7 @@
         "force_size": "Disabled",
         "custom_width": 512,
         "custom_height": 512,
-        "frame_load_cap": 32,
+        "frame_load_cap": 128,
         "skip_first_frames": 0,
         "select_every_nth": 1,
         "choose video to upload": "image",
@@ -461,7 +243,7 @@
           "hidden": false,
           "paused": false,
           "params": {
-            "frame_load_cap": 32,
+            "frame_load_cap": 128,
             "skip_first_frames": 0,
             "force_rate": 0,
             "filename": "d6.mp4",
@@ -471,321 +253,6 @@
           }
         }
       }
-    },
-    {
-      "id": 186,
-      "type": "ImageConcanate",
-      "pos": [
-        1019,
-        28
-      ],
-      "size": {
-        "0": 315,
-        "1": 102
-      },
-      "flags": {},
-      "order": 21,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image1",
-          "type": "IMAGE",
-          "link": 443
-        },
-        {
-          "name": "image2",
-          "type": "IMAGE",
-          "link": 440
-        }
-      ],
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            441
-          ],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "ImageConcanate"
-      },
-      "widgets_values": [
-        "right",
-        true
-      ]
-    },
-    {
-      "id": 187,
-      "type": "Note",
-      "pos": [
-        118,
-        -243
-      ],
-      "size": {
-        "0": 210,
-        "1": 58
-      },
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "properties": {
-        "text": ""
-      },
-      "widgets_values": [
-        "Connect this if you want to use the eye/lip retargeting mode"
-      ],
-      "color": "#432",
-      "bgcolor": "#653"
-    },
-    {
-      "id": 83,
-      "type": "CreateShapeMask",
-      "pos": [
-        660,
-        -820
-      ],
-      "size": {
-        "0": 315,
-        "1": 270
-      },
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
-          "links": [
-            192
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "mask_inverted",
-          "type": "MASK",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "CreateShapeMask"
-      },
-      "widgets_values": [
-        "square",
-        1,
-        256,
-        256,
-        0,
-        512,
-        512,
-        480,
-        480
-      ]
-    },
-    {
-      "id": 81,
-      "type": "GrowMaskWithBlur",
-      "pos": [
-        1030,
-        -820
-      ],
-      "size": {
-        "0": 315,
-        "1": 246
-      },
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 192,
-          "slot_index": 0
-        }
-      ],
-      "outputs": [
-        {
-          "name": "mask",
-          "type": "MASK",
-          "links": [
-            187,
-            463
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "mask_inverted",
-          "type": "MASK",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "GrowMaskWithBlur"
-      },
-      "widgets_values": [
-        0,
-        0,
-        true,
-        false,
-        13.9,
-        1,
-        1,
-        false
-      ]
-    },
-    {
-      "id": 191,
-      "type": "LivePortraitComposite",
-      "pos": [
-        1063,
-        -427
-      ],
-      "size": {
-        "0": 355.20001220703125,
-        "1": 86
-      },
-      "flags": {},
-      "order": 19,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "source_image",
-          "type": "IMAGE",
-          "link": 457
-        },
-        {
-          "name": "cropped_image",
-          "type": "IMAGE",
-          "link": 454
-        },
-        {
-          "name": "liveportrait_out",
-          "type": "LP_OUT",
-          "link": 452
-        },
-        {
-          "name": "mask",
-          "type": "MASK",
-          "link": 463
-        }
-      ],
-      "outputs": [
-        {
-          "name": "full_images",
-          "type": "IMAGE",
-          "links": [
-            458
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "mask",
-          "type": "MASK",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitComposite"
-      }
-    },
-    {
-      "id": 181,
-      "type": "GetImageSizeAndCount",
-      "pos": [
-        1612,
-        -297
-      ],
-      "size": {
-        "0": 210,
-        "1": 86
-      },
-      "flags": {},
-      "order": 20,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "link": 458
-        }
-      ],
-      "outputs": [
-        {
-          "name": "image",
-          "type": "IMAGE",
-          "links": [
-            440
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "512 width",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        },
-        {
-          "name": "512 height",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        },
-        {
-          "name": "32 count",
-          "type": "INT",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "GetImageSizeAndCount"
-      }
-    },
-    {
-      "id": 133,
-      "type": "PrimitiveNode",
-      "pos": [
-        -1541,
-        -13
-      ],
-      "size": {
-        "0": 210,
-        "1": 82
-      },
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "INT",
-          "type": "INT",
-          "links": [
-            302
-          ],
-          "widget": {
-            "name": "frame_load_cap"
-          },
-          "slot_index": 0
-        }
-      ],
-      "title": "frame_load_cap",
-      "properties": {
-        "Run widget replace on values": false
-      },
-      "widgets_values": [
-        32,
-        "fixed"
-      ]
     },
     {
       "id": 165,
@@ -799,7 +266,7 @@
         "1": 242
       },
       "flags": {},
-      "order": 9,
+      "order": 12,
       "mode": 0,
       "inputs": [
         {
@@ -866,168 +333,18 @@
       ]
     },
     {
-      "id": 196,
-      "type": "LoadImage",
-      "pos": [
-        -1256,
-        -572
-      ],
-      "size": {
-        "0": 315,
-        "1": 314
-      },
-      "flags": {},
-      "order": 6,
-      "mode": 0,
-      "outputs": [
-        {
-          "name": "IMAGE",
-          "type": "IMAGE",
-          "links": [
-            466
-          ],
-          "shape": 3,
-          "slot_index": 0
-        },
-        {
-          "name": "MASK",
-          "type": "MASK",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LoadImage"
-      },
-      "widgets_values": [
-        "oldman.jpg",
-        "image"
-      ]
-    },
-    {
-      "id": 168,
-      "type": "VHS_VideoCombine",
-      "pos": [
-        1495,
-        -143
-      ],
-      "size": [
-        1103.3974609375,
-        865.69873046875
-      ],
-      "flags": {},
-      "order": 22,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 441
-        },
-        {
-          "name": "audio",
-          "type": "VHS_AUDIO",
-          "link": null
-        },
-        {
-          "name": "meta_batch",
-          "type": "VHS_BatchManager",
-          "link": null
-        },
-        {
-          "name": "vae",
-          "type": "VAE",
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "Filenames",
-          "type": "VHS_FILENAMES",
-          "links": null,
-          "shape": 3
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "VHS_VideoCombine"
-      },
-      "widgets_values": {
-        "frame_rate": 24,
-        "loop_count": 0,
-        "filename_prefix": "LivePortrait",
-        "format": "video/h264-mp4",
-        "pix_fmt": "yuv420p",
-        "crf": 19,
-        "save_metadata": true,
-        "pingpong": false,
-        "save_output": false,
-        "videopreview": {
-          "hidden": false,
-          "paused": false,
-          "params": {
-            "filename": "LivePortrait_00002.mp4",
-            "subfolder": "",
-            "type": "temp",
-            "format": "video/h264-mp4",
-            "frame_rate": 24
-          }
-        }
-      }
-    },
-    {
-      "id": 180,
-      "type": "LivePortraitRetargeting",
-      "pos": [
-        -320,
-        -311
-      ],
-      "size": {
-        "0": 430.8000183105469,
-        "1": 130
-      },
-      "flags": {},
-      "order": 17,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "driving_crop_info",
-          "type": "CROPINFO",
-          "link": 470,
-          "slot_index": 0
-        }
-      ],
-      "outputs": [
-        {
-          "name": "retargeting_info",
-          "type": "RETARGETINGINFO",
-          "links": [],
-          "shape": 3,
-          "slot_index": 0
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "LivePortraitRetargeting"
-      },
-      "widgets_values": [
-        true,
-        1,
-        true,
-        1
-      ]
-    },
-    {
       "id": 197,
       "type": "LivePortraitCropper",
       "pos": [
-        -636,
-        187
+        -640,
+        360
       ],
       "size": {
         "0": 330,
         "1": 242
       },
       "flags": {},
-      "order": 13,
+      "order": 16,
       "mode": 0,
       "inputs": [
         {
@@ -1039,7 +356,7 @@
         {
           "name": "cropper",
           "type": "LPCROPPER",
-          "link": 468
+          "link": 476
         },
         {
           "name": "source_image",
@@ -1081,18 +398,299 @@
       ]
     },
     {
+      "id": 198,
+      "type": "LivePortraitLoadMediaPipeCropper",
+      "pos": [
+        -1256,
+        -893
+      ],
+      "size": {
+        "0": 315,
+        "1": 82
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "cropper",
+          "type": "LPCROPPER",
+          "links": [
+            474
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitLoadMediaPipeCropper"
+      },
+      "widgets_values": [
+        "CPU",
+        true
+      ]
+    },
+    {
+      "id": 1,
+      "type": "DownloadAndLoadLivePortraitModels",
+      "pos": [
+        -934,
+        -1067
+      ],
+      "size": {
+        "0": 302.43463134765625,
+        "1": 58
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "live_portrait_pipe",
+          "type": "LIVEPORTRAITPIPE",
+          "links": [
+            446,
+            448,
+            472
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DownloadAndLoadLivePortraitModels"
+      },
+      "widgets_values": [
+        "fp16"
+      ]
+    },
+    {
+      "id": 200,
+      "type": "Note",
+      "pos": [
+        -1542,
+        -877
+      ],
+      "size": [
+        265.68303695794293,
+        168.53929752859244
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "properties": {
+        "text": ""
+      },
+      "widgets_values": [
+        "Choose your face detector here, MediaPipe doesn't run on GPU and isn't as good at detecting, but is faster on CPU and has Apache 2.0 license.\n\nInsightface can be run on GPU and is better at detecting, but it's model license is NON-COMMERCIAL"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 199,
+      "type": "Reroute",
+      "pos": [
+        -855,
+        -812
+      ],
+      "size": [
+        115.6,
+        26
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 474
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LPCROPPER",
+          "type": "LPCROPPER",
+          "links": [
+            475,
+            476
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": true,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 133,
+      "type": "PrimitiveNode",
+      "pos": [
+        -1533,
+        -164
+      ],
+      "size": {
+        "0": 210,
+        "1": 82
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            302
+          ],
+          "widget": {
+            "name": "frame_load_cap"
+          },
+          "slot_index": 0
+        }
+      ],
+      "title": "frame_load_cap",
+      "properties": {
+        "Run widget replace on values": false
+      },
+      "widgets_values": [
+        128,
+        "fixed"
+      ]
+    },
+    {
+      "id": 187,
+      "type": "Note",
+      "pos": [
+        80,
+        140
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "properties": {
+        "text": ""
+      },
+      "widgets_values": [
+        "Connect this if you want to use the eye/lip retargeting mode"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 182,
+      "type": "GetImageSizeAndCount",
+      "pos": [
+        -850,
+        -195
+      ],
+      "size": {
+        "0": 210,
+        "1": 86
+      },
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 436
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            451,
+            469
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "480 width",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "480 height",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "128 count",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageSizeAndCount"
+      }
+    },
+    {
+      "id": 180,
+      "type": "LivePortraitRetargeting",
+      "pos": [
+        -390,
+        120
+      ],
+      "size": {
+        "0": 430.8000183105469,
+        "1": 130
+      },
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "driving_crop_info",
+          "type": "CROPINFO",
+          "link": 470,
+          "slot_index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "name": "retargeting_info",
+          "type": "RETARGETINGINFO",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitRetargeting"
+      },
+      "widgets_values": [
+        true,
+        1,
+        true,
+        1
+      ]
+    },
+    {
       "id": 190,
       "type": "LivePortraitProcess",
       "pos": [
-        551,
-        -383
+        166,
+        -422
       ],
       "size": {
         "0": 430.8000183105469,
         "1": 282
       },
       "flags": {},
-      "order": 18,
+      "order": 21,
       "mode": 0,
       "inputs": [
         {
@@ -1153,6 +751,452 @@
         "relative",
         0.000003
       ]
+    },
+    {
+      "id": 83,
+      "type": "CreateShapeMask",
+      "pos": [
+        407,
+        -876
+      ],
+      "size": {
+        "0": 315,
+        "1": 270
+      },
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            192
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "mask_inverted",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CreateShapeMask"
+      },
+      "widgets_values": [
+        "square",
+        1,
+        256,
+        256,
+        0,
+        512,
+        512,
+        480,
+        480
+      ]
+    },
+    {
+      "id": 81,
+      "type": "GrowMaskWithBlur",
+      "pos": [
+        751,
+        -873
+      ],
+      "size": {
+        "0": 315,
+        "1": 246
+      },
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 192,
+          "slot_index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            187,
+            463
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "mask_inverted",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GrowMaskWithBlur"
+      },
+      "widgets_values": [
+        0,
+        0,
+        true,
+        false,
+        13.9,
+        1,
+        1,
+        false
+      ]
+    },
+    {
+      "id": 82,
+      "type": "MaskPreview+",
+      "pos": [
+        1091,
+        -873
+      ],
+      "size": {
+        "0": 210,
+        "1": 246
+      },
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 187
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MaskPreview+"
+      }
+    },
+    {
+      "id": 181,
+      "type": "GetImageSizeAndCount",
+      "pos": [
+        1083,
+        -443
+      ],
+      "size": {
+        "0": 210,
+        "1": 86
+      },
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 458
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            478
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "512 width",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "512 height",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "128 count",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetImageSizeAndCount"
+      }
+    },
+    {
+      "id": 168,
+      "type": "VHS_VideoCombine",
+      "pos": [
+        630,
+        -302
+      ],
+      "size": [
+        669.8613793918787,
+        973.8613793918787
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 478
+        },
+        {
+          "name": "audio",
+          "type": "VHS_AUDIO",
+          "link": null
+        },
+        {
+          "name": "meta_batch",
+          "type": "VHS_BatchManager",
+          "link": null
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Filenames",
+          "type": "VHS_FILENAMES",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VHS_VideoCombine"
+      },
+      "widgets_values": {
+        "frame_rate": 16,
+        "loop_count": 0,
+        "filename_prefix": "LivePortrait",
+        "format": "video/h264-mp4",
+        "pix_fmt": "yuv420p",
+        "crf": 19,
+        "save_metadata": true,
+        "pingpong": false,
+        "save_output": false,
+        "videopreview": {
+          "hidden": false,
+          "paused": false,
+          "params": {
+            "filename": "LivePortrait_00005.mp4",
+            "subfolder": "",
+            "type": "temp",
+            "format": "video/h264-mp4",
+            "frame_rate": 16
+          }
+        }
+      }
+    },
+    {
+      "id": 196,
+      "type": "LoadImage",
+      "pos": [
+        -1267,
+        -582
+      ],
+      "size": [
+        330.4995504373579,
+        384.24166509694487
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            466
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "ComfyUI_temp_gjesb_00023_.png",
+        "image"
+      ]
+    },
+    {
+      "id": 192,
+      "type": "Reroute",
+      "pos": [
+        73,
+        -519
+      ],
+      "size": [
+        82,
+        26
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 455
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            456,
+            457
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": true,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 191,
+      "type": "LivePortraitComposite",
+      "pos": [
+        673,
+        -507
+      ],
+      "size": {
+        "0": 355.20001220703125,
+        "1": 86
+      },
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 457
+        },
+        {
+          "name": "cropped_image",
+          "type": "IMAGE",
+          "link": 454
+        },
+        {
+          "name": "liveportrait_out",
+          "type": "LP_OUT",
+          "link": 452
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 463
+        }
+      ],
+      "outputs": [
+        {
+          "name": "full_images",
+          "type": "IMAGE",
+          "links": [
+            458
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitComposite"
+      }
+    },
+    {
+      "id": 189,
+      "type": "LivePortraitCropper",
+      "pos": [
+        -203,
+        -830
+      ],
+      "size": {
+        "0": 330,
+        "1": 242
+      },
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pipeline",
+          "type": "LIVEPORTRAITPIPE",
+          "link": 446,
+          "slot_index": 0
+        },
+        {
+          "name": "cropper",
+          "type": "LPCROPPER",
+          "link": 475,
+          "slot_index": 1
+        },
+        {
+          "name": "source_image",
+          "type": "IMAGE",
+          "link": 445
+        }
+      ],
+      "outputs": [
+        {
+          "name": "cropped_image",
+          "type": "IMAGE",
+          "links": null,
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "crop_info",
+          "type": "CROPINFO",
+          "links": [
+            449
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LivePortraitCropper"
+      },
+      "widgets_values": [
+        512,
+        2.3,
+        0,
+        -0.125,
+        0,
+        "large-small",
+        true
+      ]
     }
   ],
   "links": [
@@ -1195,38 +1239,6 @@
       182,
       0,
       "IMAGE"
-    ],
-    [
-      440,
-      181,
-      0,
-      186,
-      1,
-      "IMAGE"
-    ],
-    [
-      441,
-      186,
-      0,
-      168,
-      0,
-      "IMAGE"
-    ],
-    [
-      443,
-      182,
-      0,
-      186,
-      0,
-      "IMAGE"
-    ],
-    [
-      444,
-      129,
-      0,
-      189,
-      1,
-      "LPCROPPER"
     ],
     [
       445,
@@ -1333,14 +1345,6 @@
       "IMAGE"
     ],
     [
-      468,
-      129,
-      0,
-      197,
-      1,
-      "LPCROPPER"
-    ],
-    [
       469,
       182,
       0,
@@ -1371,6 +1375,38 @@
       197,
       0,
       "LIVEPORTRAITPIPE"
+    ],
+    [
+      474,
+      198,
+      0,
+      199,
+      0,
+      "*"
+    ],
+    [
+      475,
+      199,
+      0,
+      189,
+      1,
+      "LPCROPPER"
+    ],
+    [
+      476,
+      199,
+      0,
+      197,
+      1,
+      "LPCROPPER"
+    ],
+    [
+      478,
+      181,
+      0,
+      168,
+      0,
+      "IMAGE"
     ]
   ],
   "groups": [],
@@ -1379,8 +1415,8 @@
     "ds": {
       "scale": 0.6209213230591553,
       "offset": {
-        "0": 1452.6772352406037,
-        "1": 986.9216386951317
+        "0": 1699.882189562642,
+        "1": 1132.3910371015413
       }
     }
   },
