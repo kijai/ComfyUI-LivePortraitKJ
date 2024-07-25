@@ -24,6 +24,10 @@ try:
     from .liveportrait.utils.cropper import CropperInsightFace
 except:
     log.warning("Can't load MediaPipe, MediaPipeCropper not available")
+try:
+    from .liveportrait.utils.cropper import CropperFaceAlignment
+except:
+    log.warning("Can't load FaceAlignment, CropperFaceAlignment not available")
 
 from .liveportrait.modules.spade_generator import SPADEDecoder
 from .liveportrait.modules.warping_network import WarpingNetwork
@@ -529,6 +533,58 @@ class LivePortraitLoadMediaPipeCropper:
 
         return (self.cropper,)
     
+class LivePortraitLoadFaceAlignmentCropper:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "face_detector": (
+                    ['blazeface', 'blazeface_back_camera', 'sfd'], {
+                        "default": 'blazeface_back_camera'
+                    }),
+
+            "landmarkrunner_device": (
+                    ['CPU', 'CUDA', 'ROCM', 'CoreML', 'torch_gpu'], {
+                        "default": 'torch_gpu'
+                    }),
+            "face_detector_device": (
+                    ['cuda', 'cpu', 'mps'], {
+                        "default": 'cuda'
+                    }),
+
+            "face_detector_dtype": (
+                    [
+                        "fp16",
+                        "bf16",
+                        "fp32",
+                    ],
+                    {"default": "fp16"},
+                ),
+            "keep_model_loaded": ("BOOLEAN", {"default": True})
+
+            },           
+        }
+
+    RETURN_TYPES = ("LPCROPPER",)
+    RETURN_NAMES = ("cropper",)
+    FUNCTION = "crop"
+    CATEGORY = "LivePortrait"
+
+    def crop(self, landmarkrunner_device, keep_model_loaded, face_detector, face_detector_device, face_detector_dtype):
+        dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[face_detector_dtype]
+        cropper_init_config = {
+            'keep_model_loaded': keep_model_loaded,
+            'onnx_device': landmarkrunner_device,
+            'face_detector_device': face_detector_device,
+            'face_detector': face_detector,
+            'face_detector_dtype': dtype
+        }
+        
+        if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
+            self.current_config = cropper_init_config
+            self.cropper = CropperFaceAlignment(**cropper_init_config)
+
+        return (self.cropper,)
+    
 class LivePortraitCropper:
     @classmethod
     def INPUT_TYPES(s):
@@ -759,6 +815,7 @@ NODE_CLASS_MAPPINGS = {
     "KeypointsToImage": KeypointsToImage,
     "LivePortraitLoadCropper": LivePortraitLoadCropper,
     "LivePortraitLoadMediaPipeCropper": LivePortraitLoadMediaPipeCropper,
+    "LivePortraitLoadFaceAlignmentCropper": LivePortraitLoadFaceAlignmentCropper,
     "LivePortraitComposite": LivePortraitComposite,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -770,5 +827,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KeypointsToImage": "LivePortrait KeypointsToImage",
     "LivePortraitLoadCropper": "LivePortrait Load InsightFaceCropper",
     "LivePortraitLoadMediaPipeCropper": "LivePortrait Load MediaPipeCropper",
+    "LivePortraitLoadFaceAlignmentCropper": "LivePortrait Load FaceAlignmentCropper",
     "LivePortraitComposite": "LivePortrait Composite",
     }
