@@ -246,7 +246,7 @@ class LivePortraitProcess:
             "lip_zero": ("BOOLEAN", {"default": False}),
             "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.001, "max": 4.0, "step": 0.001}),
             "stitching": ("BOOLEAN", {"default": True}),
-            "delta_multiplier": ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.001}),
+            "delta_multiplier": ("FLOAT", {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.001}),
             "mismatch_method": (
                     [
                         "constant",
