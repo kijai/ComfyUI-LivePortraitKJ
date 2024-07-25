@@ -1,4 +1,16 @@
 # ComfyUI nodes to use [LivePortrait](https://github.com/KwaiVGI/LivePortrait)
+## Update 2
+
+Added another alternative face detector: https://github.com/1adrianb/face-alignment
+
+![image](https://github.com/user-attachments/assets/1a77752a-9688-4b6f-9363-736367ad711a)
+
+As this can use blazeface back camera model (or SFD), it's far better for smaller faces than MediaPipe, that only can use the blazeface short -model.
+The warmup on the first run when using this can take a long time, but subsequent runs are quick.
+
+Example detection using the blazeface_back_camera:
+
+https://github.com/user-attachments/assets/40b1fdb4-0b1f-4ea8-8322-aa9151055db0
 
 ## Update
 
