@@ -4,3 +4,4 @@ opencv-python
 onnxruntime
 pykalman
 mediapipe
+onnx2torch
