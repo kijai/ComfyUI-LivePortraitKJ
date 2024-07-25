@@ -395,7 +395,10 @@ class LivePortraitComposite:
         cropped_image = cropped_image.permute(0, 3, 1, 2)
 
         if mask is not None:
-            crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
+            if len(mask.size())==2:
+                crop_mask = mask.unsqueeze(0).unsqueeze(-1).expand(-1, -1, -1, 3)
+            else:    
+                crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
         else:
             log.info("Using default mask template")
             crop_mask = cv2.imread(os.path.join(script_directory, "liveportrait", "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
