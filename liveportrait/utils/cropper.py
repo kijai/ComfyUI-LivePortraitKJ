@@ -1,7 +1,6 @@
 # coding: utf-8
 
 import numpy as np
-import torch
 from typing import List, Union, Tuple
 from dataclasses import dataclass, field
 import cv2#; cv2.setNumThreads(0); cv2.ocl.setUseOpenCL(False)
@@ -27,6 +26,7 @@ class CropperInsightFace(object):
     def __init__(self, **kwargs) -> None:
         device_id = kwargs.get('device_id', 0)
         provider = kwargs.get('onnx_device', 'CPU')
+        detection_threshold = kwargs.get('detection_threshold', 0.5)
         self.landmark_runner = LandmarkRunner(
             ckpt_path=os.path.join(folder_paths.models_dir, 'liveportrait', 'landmark.onnx'),
             onnx_provider=provider,
@@ -40,7 +40,7 @@ class CropperInsightFace(object):
             root=os.path.join(folder_paths.models_dir, 'insightface'),
             providers=[provider + 'ExecutionProvider',]
         )
-        self.face_analysis_wrapper.prepare(ctx_id=device_id, det_size=(512, 512))
+        self.face_analysis_wrapper.prepare(ctx_id=device_id, det_size=(512, 512), det_thresh=detection_threshold)
         self.face_analysis_wrapper.warmup()
 
     def crop_single_image(self, img_rgb, dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate):

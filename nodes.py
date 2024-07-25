@@ -483,7 +483,10 @@ class LivePortraitLoadCropper:
                         "default": 'CPU'
                     }),
             "keep_model_loaded": ("BOOLEAN", {"default": True})
-            },           
+            },
+            "optional": {
+                "detection_threshold": ("FLOAT", {"default": 0.5, "min": 0.05, "max": 1.0, "step": 0.01}),
+            },
         }
 
     RETURN_TYPES = ("LPCROPPER",)
@@ -491,10 +494,11 @@ class LivePortraitLoadCropper:
     FUNCTION = "crop"
     CATEGORY = "LivePortrait"
 
-    def crop(self, onnx_device, keep_model_loaded):
+    def crop(self, onnx_device, keep_model_loaded, detection_threshold=0.5):
         cropper_init_config = {
             'keep_model_loaded': keep_model_loaded,
-            'onnx_device': onnx_device
+            'onnx_device': onnx_device,
+            'detection_threshold': detection_threshold
         }
         
         if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
