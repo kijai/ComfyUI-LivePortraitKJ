@@ -460,7 +460,7 @@
         "Node name for S&R": "DownloadAndLoadLivePortraitModels"
       },
       "widgets_values": [
-        "fp16"
+        "auto"
       ]
     },
     {
