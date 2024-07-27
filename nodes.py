@@ -729,6 +729,7 @@ class KeypointsToImage:
     def INPUT_TYPES(s):
         return {"required": {
             "crop_info": ("CROPINFO", {"default": []}),
+            "draw_lines": ("BOOLEAN", {"default": False}),
             },
         }
 
@@ -737,20 +738,45 @@ class KeypointsToImage:
     FUNCTION = "drawkeypoints"
     CATEGORY = "LivePortrait"
 
-    def drawkeypoints(self, crop_info):
-        height, width = crop_info["crop_info_list"][0]['input_image_size']
+    def drawkeypoints(self, crop_info, draw_lines):
+        #           left upper eye | left lower eye | right upper eye | right lower eye | upper lip top | lower lip bottom | upper lip bottom | lower lip top | jawline         | left eyebrow | right eyebrow | nose            | left pupil    | right pupil  |  nose center
+        indices = [                  12,               24,              37,               48,             66,                85,                96,             108,              145,           165,            185,             197,             198,            199,          203]
+        colorlut = [(0, 0, 255),     (0, 255, 0),     (0, 0, 255),      (0, 255, 0),      (255, 0, 0),    (255, 0, 255),     (255, 255, 0),     (0, 255, 255),  (128, 128, 128), (128, 128, 0), (128, 128, 0),   (0,128,128),    (255, 255,255),   (255, 255,255), (255,255,255)]
+        colors = []
+        c = 0
+        for i in range(203):
+            if i == indices[c]:
+                c+=1
+            colors.append(colorlut[c])
+        try:
+            height, width = crop_info["crop_info_list"][0]['input_image_size']
+        except:
+            height, width = 512, 512
         keypoints_img_list = []
         pbar = comfy.utils.ProgressBar(len(crop_info))
         for crop in crop_info["crop_info_list"]:
             if crop:
                 keypoints = crop['lmk_crop'].copy()
-                # Draw each landmark as a circle
                 blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
-                for (x, y) in keypoints:
-                    # Ensure the coordinates are within the dimensions of the blank image
-                    if 0 <= x < width and 0 <= y < height:
-                        cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
-
+                
+                if draw_lines:
+                    start_idx = 0
+                    for end_idx in indices:
+                        color = colors[start_idx]
+                        for i in range(start_idx, end_idx - 1):
+                            pt1 = tuple(map(int, keypoints[i]))
+                            pt2 = tuple(map(int, keypoints[i+1]))
+                            if all(0 <= c < d for c, d in zip(pt1 + pt2, (width, height) * 2)):
+                                cv2.line(blank_image, pt1, pt2, color, thickness=1)
+                        if end_idx == start_idx +1:
+                            x,y = keypoints[start_idx]
+                            cv2.circle(blank_image, (int(x), int(y)), radius=1, thickness=-1, color=colors[start_idx])
+                              
+                        start_idx = end_idx
+                else:
+                    for index, (x, y) in enumerate(keypoints):
+                        cv2.circle(blank_image, (int(x), int(y)), radius=1, thickness=-1, color=colors[index])
+                
                 keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
             else:
                 keypoints_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
@@ -759,7 +785,6 @@ class KeypointsToImage:
 
         keypoints_img_tensor = (
             torch.stack([torch.from_numpy(np_array) for np_array in keypoints_img_list]) / 255).float()
-
 
         return (keypoints_img_tensor,)
 
