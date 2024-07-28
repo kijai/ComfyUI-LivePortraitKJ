@@ -436,7 +436,7 @@ class LivePortraitComposite:
                     )
 
                 mask_ori = _transform_img_kornia(
-                    crop_mask,
+                    crop_mask[min(i,len(crop_mask)-1)].unsqueeze(0),
                     crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(W, H),
                     device=device
