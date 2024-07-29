@@ -65,6 +65,13 @@ class LivePortraitPipeline(object):
         driving_info = []
         driving_exp_list = []
         driving_rot_list = []
+
+        has_reference = "reference_face" in crop_info
+        if has_reference:
+            ref_x_d_info = crop_info["reference_face"]
+            ref_R_d = get_rotation_matrix(
+                ref_x_d_info["pitch"], ref_x_d_info["yaw"], ref_x_d_info["roll"]
+            )
         
         for i in tqdm(range(driving_images.shape[0]), desc='Processing driving images...', total=driving_images.shape[0], disable=disable_progress_bar):
             #get driving keypoints info
@@ -79,7 +86,7 @@ class LivePortraitPipeline(object):
             x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
             
             if i == 0:
-                first = x_d_info
+                first = ref_x_d_info if has_reference else x_d_info
 
             driving_info.append(x_d_info)
 
@@ -93,7 +100,10 @@ class LivePortraitPipeline(object):
 
         if relative_motion_mode == "source_video_smoothed":
             x_d_r_lst = []
-            first_driving_rot = driving_rot_list[0].cpu().numpy().astype(np.float32).transpose(0, 2, 1)
+            if has_reference:
+                first_driving_rot = ref_R_d.cpu().numpy().astype(np.float32).transpose(0, 2, 1)
+            else:
+                first_driving_rot = driving_rot_list[0].cpu().numpy().astype(np.float32).transpose(0, 2, 1)
             for i in tqdm(range(source_images_num), desc='Smoothing...', total=source_images_num):
                 if driving_rot_list[i] is None:
                     x_d_r_lst.append(None)
@@ -142,8 +152,8 @@ class LivePortraitPipeline(object):
 
             if relative_motion_mode == "relative":
                 if i == 0:
-                    R_d_0 = R_d
-                    x_d_0_info = x_d_info
+                    R_d_0 = ref_R_d if has_reference else R_d
+                    x_d_0_info = ref_x_d_info if has_reference else x_d_info
                 R_new = (R_d @ R_d_0.permute(0, 2, 1)) @ R_s
                 delta_new = x_s_info["exp"] + (x_d_info["exp"] - x_d_0_info["exp"])
                 scale_new = x_s_info["scale"] * (x_d_info["scale"] / x_d_0_info["scale"])
