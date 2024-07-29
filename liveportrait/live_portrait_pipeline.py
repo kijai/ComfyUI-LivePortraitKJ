@@ -115,8 +115,8 @@ class LivePortraitPipeline(object):
                 dot = np.dot(driving_rot, first_driving_rot) @ source_rot
                 x_d_r_lst.append(dot)
   
-            driving_exp_list_smooth = smooth(driving_exp_list, source_info[0]["exp"].shape, device, observation_variance=driving_smooth_observation_variance)
-            driving_rot_list_smooth = smooth(x_d_r_lst, source_rot_list[0].shape, device, observation_variance=driving_smooth_observation_variance)
+            driving_exp_list_smooth = smooth(driving_exp_list, (1, 21, 3), device, observation_variance=driving_smooth_observation_variance)
+            driving_rot_list_smooth = smooth(x_d_r_lst, (1, 3, 3), device, observation_variance=driving_smooth_observation_variance)
 
         pbar = comfy.utils.ProgressBar(total_frames)
 
