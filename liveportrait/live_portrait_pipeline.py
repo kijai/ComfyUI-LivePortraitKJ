@@ -85,8 +85,10 @@ class LivePortraitPipeline(object):
                 continue
             x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
             
-            if i == 0:
-                first = ref_x_d_info if has_reference else x_d_info
+            if has_reference:
+                first = ref_x_d_info
+            elif i == 0:
+                first = x_d_info
 
             driving_info.append(x_d_info)
 
