@@ -8,7 +8,7 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 import gc
-
+import torch
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
@@ -238,7 +238,6 @@ class LivePortraitProcess:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-
             "pipeline": ("LIVEPORTRAITPIPE",),
             "crop_info": ("CROPINFO", {"default": {}}),
             "source_image": ("IMAGE",),
@@ -342,20 +341,31 @@ class LivePortraitProcess:
         )
 
         total_frames = len(out["out_list"])
-      
-        if total_frames > 1:
-            cropped_image_list = []
-            for i in (range(total_frames)):
-                if not out["out_list"][i]:
-                    cropped_image_list.append(torch.zeros(1, 512, 512, 3, dtype=torch.float32, device = "cpu"))
+        
+        cropped_image_list = []
+        for i in range(total_frames):
+            if not (i < len(out["out_list"]) and 
+                    out["out_list"][i] and 
+                    "out" in out["out_list"][i] and 
+                    out["out_list"][i]["out"] is not None and 
+                    driving_landmarks[i] is not None):
+                # Create a blank image tensor with the same dimensions as the cropped image
+                if i > 0 and len(cropped_image_list) > 0:
+                    # Use the shape of the previous valid cropped image
+                    blank_shape = cropped_image_list[-1].shape
                 else:
-                    cropped_image = torch.clamp(out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1).cpu()
-                    cropped_image_list.append(cropped_image)
+                    # Fallback to the shape of the driving images
+                    blank_shape = (1, driving_images.shape[3], driving_images.shape[1], driving_images.shape[2])
+                blank_image = torch.zeros(blank_shape, dtype=torch.float32, device=source_image.device)
+                cropped_image_list.append(blank_image)
+            else:
+                cropped_image = torch.clamp(out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1).cpu()
+                print(f"Cropped image shape: {cropped_image.shape}")
+                cropped_image_list.append(cropped_image)
 
-            cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
-        else:
-            cropped_out_tensors = torch.clamp(out["out_list"][0]["out"], 0, 1).permute(0, 2, 3, 1)
-      
+        cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
+        print(f"Final output tensor shape: {cropped_out_tensors.shape}")
+
         return (cropped_out_tensors, out,)
     
 class LivePortraitComposite:
@@ -708,11 +718,14 @@ class LivePortraitRetargeting:
     CATEGORY = "LivePortrait"
 
     def process(self, driving_crop_info, eye_retargeting, eyes_retargeting_multiplier, lip_retargeting, lip_retargeting_multiplier):
-
+        
         driving_landmarks = []
         for crop in driving_crop_info["crop_info_list"]:
-            driving_landmarks.append(crop['lmk_crop'])
-                          
+            if crop is not None and 'lmk_crop' in crop:
+                driving_landmarks.append(crop['lmk_crop'])
+            else:
+                driving_landmarks.append(None)  # Append None for frames where no face was detected
+        
         retargeting_info = {
             'eye_retargeting': eye_retargeting,
             'eyes_retargeting_multiplier': eyes_retargeting_multiplier,
