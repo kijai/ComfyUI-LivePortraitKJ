@@ -301,16 +301,14 @@ class LivePortraitProcess:
     ):
         if driving_images.shape[0] < source_image.shape[0]:
             raise ValueError("The number of driving images should be larger than the number of source images.")
-        
-        blank_shape = (1, 512, 512, 3)
-        total_frames = len(driving_images)
 
-        # Fast-forward to the first valid crop info
+        # Find first image with face
         first_valid_index = next((i for i, info in enumerate(crop_info["crop_info_list"]) if info is not None), None)
         
         # If no valid crop info, return blank images and empty output
         if first_valid_index is None:
             log.warning("No valid face detected in any of the source images. Returning blank images.")
+            #what is correct size to return? This is working 
             blank_images = torch.zeros((total_frames, 512, 512, 3), dtype=torch.float32, device=source_image.device)
             empty_out = {
                 "out_list": [None] * total_frames,
@@ -318,7 +316,7 @@ class LivePortraitProcess:
             }
             return (blank_images, empty_out)
         
-        # Adjust inputs to start from the first valid frame
+        # Fast-forward to start from the first valid frame with a face
         source_image = source_image[first_valid_index:]
         driving_images = driving_images[first_valid_index:]
         crop_info["crop_info_list"] = crop_info["crop_info_list"][first_valid_index:]
@@ -365,6 +363,13 @@ class LivePortraitProcess:
             mismatch_method
         )
 
+        # Get the shape of the first output in the "out_list". What is correct size? This is working
+        try:
+            blank_shape = torch.clamp(out["out_list"][0]["out"], 0, 1).permute(0, 2, 3, 1).cpu().shape
+        except (IndexError, KeyError, AttributeError):
+            # Use a default shape if no faces. Prob shouldn't happen
+            blank_shape = (1, 512, 512, 3)
+
         total_frames = len(driving_images)
         
         cropped_image_list = []
@@ -383,7 +388,7 @@ class LivePortraitProcess:
             cropped_image_list = blank_frames + cropped_image_list
 
         cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
-        # END OF CHANGES
+
         return (cropped_out_tensors, out,)
     
 class LivePortraitComposite:
@@ -418,7 +423,7 @@ class LivePortraitComposite:
         if mm.is_device_mps(device): 
             device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
 
-        # Check if liveportrait_out["out_list"] is empty
+        # Check if liveportrait_out["out_list"] is empty return source
         if not liveportrait_out["out_list"]:
             log.warning("LivePortrait output is empty. Returning source images.")
             return (source_image, torch.zeros_like(source_image[:, :, :, 0]))
@@ -674,8 +679,13 @@ class LivePortraitCropper:
         # Initialize a progress bar for the combined operation
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting, cropping, and processing..', total=len(source_image_np)):
-            # Cropping operation
-            crop_info, cropped_image_256 = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
+            
+            # Cropping operation - handle occasional unpack error from insightface
+            try:
+                crop_info, cropped_image_256 = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
+            except Exception as e:
+                log.error(f"Error during cropping operation for frame {i}: {str(e)}")
+                crop_info, cropped_image_256 = None, None
             
             # Processing source images
             if crop_info:
@@ -761,7 +771,6 @@ class LivePortraitRetargeting:
         }
 
         return (retargeting_info,)
-
 
 class KeypointsToImage:
     @classmethod
