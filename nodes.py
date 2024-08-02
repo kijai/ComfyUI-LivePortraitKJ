@@ -8,7 +8,6 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 import gc
-import torch
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
