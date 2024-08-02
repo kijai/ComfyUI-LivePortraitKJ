@@ -303,7 +303,7 @@ class LivePortraitProcess:
 
         # Find first image with face
         first_valid_index = next((i for i, info in enumerate(crop_info["crop_info_list"]) if info is not None), None)
-        
+        total_frames = len(driving_images)
         # If no valid crop info, return blank images and empty output
         if first_valid_index is None:
             log.warning("No valid face detected in any of the source images. Returning blank images.")
@@ -370,7 +370,7 @@ class LivePortraitProcess:
             # Use a default shape if no faces. Prob shouldn't happen
             blank_shape = (1, 512, 512, 3)
 
-        total_frames = len(driving_images)
+        
         
         cropped_image_list = []
         for i in range(total_frames):
@@ -423,9 +423,9 @@ class LivePortraitComposite:
         if mm.is_device_mps(device): 
             device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
 
-        # Check if liveportrait_out["out_list"] is empty return source
-        if not liveportrait_out["out_list"]:
-            log.warning("LivePortrait output is empty. Returning source images.")
+        # Check if 'original_length' doesn't exist in liveportrait_out. If not, process either failed or there were no faces. Return source
+        if 'original_length' not in liveportrait_out:
+            log.warning("LivePortrait processing was not successful. Returning source images.")
             return (source_image, torch.zeros_like(source_image[:, :, :, 0]))
 
         total_frames = liveportrait_out['original_length']
