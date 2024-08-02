@@ -315,6 +315,7 @@ class LivePortraitProcess:
             }
             return (blank_images, empty_out)
         
+        orig_len = driving_images.shape[0]
         # Fast-forward to start from the first valid frame with a face
         source_image = source_image[first_valid_index:]
         driving_images = driving_images[first_valid_index:]
@@ -387,7 +388,7 @@ class LivePortraitProcess:
             cropped_image_list = blank_frames + cropped_image_list
 
         cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
-
+        out["original_length"] = orig_len
         return (cropped_out_tensors, out,)
     
 class LivePortraitComposite:
@@ -427,6 +428,7 @@ class LivePortraitComposite:
             log.warning("LivePortrait output is empty. Returning source images.")
             return (source_image, torch.zeros_like(source_image[:, :, :, 0]))
 
+        total_frames = liveportrait_out['original_length']
         B, H, W, C = source_image.shape
         source_image = source_image.permute(0, 3, 1, 2) # B,H,W,C -> B,C,H,W
         cropped_image = cropped_image.permute(0, 3, 1, 2)
@@ -446,48 +448,56 @@ class LivePortraitComposite:
         composited_image_list = []
         out_mask_list = []
 
-        total_frames = len(source_image)
+        
         log.info(f"Total frames: {total_frames}")
 
         # Calculate first valid index based on liveportrait_out
-        first_valid_index = total_frames - len(liveportrait_out["out_list"])
+        first_valid_index = max(0, total_frames - len(liveportrait_out["out_list"]))
+
+        total_frames = liveportrait_out['original_length']
+        first_valid_index = max(0, total_frames - len(liveportrait_out["out_list"]))
+        output_index = 0
 
         pbar = comfy.utils.ProgressBar(total_frames)
         for i in tqdm(range(total_frames), desc='Compositing..', total=total_frames):
-            source_frame = source_image[i].unsqueeze(0).to(device)
-            
-            if i < first_valid_index:
+            if liveportrait_out["mismatch_method"] == "cut":
+                source_frame = source_image[min(i, source_image.shape[0] - 1)].unsqueeze(0).to(device)
+            else:
+                source_frame = _get_source_frame(source_image, i, liveportrait_out["mismatch_method"]).unsqueeze(0).to(device)
+
+            if i < first_valid_index or output_index >= len(liveportrait_out["out_list"]) or not liveportrait_out["out_list"][output_index]:
                 composited_image_list.append(source_frame.cpu())
                 out_mask_list.append(torch.zeros((1, 3, H, W), device="cpu"))
+                log.debug(f"Frame {i}: Using source frame (no processed data available)")
             else:
-                lp_index = i - first_valid_index
-                if lp_index >= len(liveportrait_out["out_list"]) or not liveportrait_out["out_list"][lp_index]:
-                    composited_image_list.append(source_frame.cpu())
-                    out_mask_list.append(torch.zeros((1, 3, H, W), device="cpu"))
-                else:
-                    cropped_image = torch.clamp(liveportrait_out["out_list"][lp_index]["out"], 0, 1).permute(0, 2, 3, 1)
+                cropped_image = torch.clamp(liveportrait_out["out_list"][output_index]["out"], 0, 1).permute(0, 2, 3, 1)
 
-                    # Transform and blend             
-                    cropped_image_to_original = _transform_img_kornia(
-                        cropped_image,
-                        crop_info["crop_info_list"][lp_index]["M_c2o"],
-                        dsize=(W, H),
-                        device=device
+                # Use output_index directly for crop info
+                crop_info_index = min(output_index, len(crop_info["crop_info_list"]) - 1)
+                
+                # Transform and blend             
+                cropped_image_to_original = _transform_img_kornia(
+                    cropped_image,
+                    crop_info["crop_info_list"][crop_info_index]["M_c2o"],
+                    dsize=(W, H),
+                    device=device
+                    )
+
+                mask_ori = _transform_img_kornia(
+                    crop_mask[0].unsqueeze(0),  # Always use the first mask
+                    crop_info["crop_info_list"][crop_info_index]["M_c2o"],
+                    dsize=(W, H),
+                    device=device
+                    )
+                
+                cropped_image_to_original_blend = torch.clip(
+                        mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
                         )
 
-                    mask_ori = _transform_img_kornia(
-                        crop_mask[0].unsqueeze(0),  # Always use the first mask
-                        crop_info["crop_info_list"][lp_index]["M_c2o"],
-                        dsize=(W, H),
-                        device=device
-                        )
-                   
-                    cropped_image_to_original_blend = torch.clip(
-                            mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
-                            )
-
-                    composited_image_list.append(cropped_image_to_original_blend.cpu())
-                    out_mask_list.append(mask_ori.cpu())
+                composited_image_list.append(cropped_image_to_original_blend.cpu())
+                out_mask_list.append(mask_ori.cpu())
+                log.debug(f"Frame {i}: Processed (output_index: {output_index}, crop_info_index: {crop_info_index})")
+                output_index += 1
             pbar.update(1)
 
         full_tensors_out = torch.cat(composited_image_list, dim=0)
@@ -890,8 +900,6 @@ NODE_CLASS_MAPPINGS = {
     "LivePortraitProcess": LivePortraitProcess,
     "LivePortraitCropper": LivePortraitCropper,
     "LivePortraitRetargeting": LivePortraitRetargeting,
-    #"KeypointScaler": KeypointScaler,
-    #"KeypointScaler": KeypointScaler,
     #"KeypointScaler": KeypointScaler,
     "KeypointsToImage": KeypointsToImage,
     "LivePortraitLoadCropper": LivePortraitLoadCropper,
