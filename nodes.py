@@ -79,6 +79,12 @@ class DownloadAndLoadLivePortraitModels:
                     ],
                     {"default": "auto"},
                 ),
+                "mode": (
+                    [
+                        "human",
+                        "animal",
+                    ],
+                ),
             },
         }
 
@@ -87,7 +93,7 @@ class DownloadAndLoadLivePortraitModels:
     FUNCTION = "loadmodel"
     CATEGORY = "LivePortrait"
 
-    def loadmodel(self, precision="fp16"):
+    def loadmodel(self, precision="fp16", mode="human"):
         device = mm.get_torch_device()
         mm.soft_empty_cache()
 
@@ -110,17 +116,20 @@ class DownloadAndLoadLivePortraitModels:
 
         pbar = comfy.utils.ProgressBar(3)
 
-        download_path = os.path.join(folder_paths.models_dir, "liveportrait")
-        model_path = os.path.join(download_path)
-
+        base_bath = os.path.join(folder_paths.models_dir, "liveportrait")
+        if mode == "human":
+            model_path = base_bath
+        else:
+            model_path = os.path.join(base_bath, "animal")
+      
         if not os.path.exists(model_path):
             log.info(f"Downloading model to: {model_path}")
             from huggingface_hub import snapshot_download
 
             snapshot_download(
                 repo_id="Kijai/LivePortrait_safetensors",
-                ignore_patterns="*landmark_model.pth*",
-                local_dir=download_path,
+                ignore_patterns=["*landmark_model.pth*","*animal*"] if mode == "human" else ["*landmark_model.pth*"],
+                local_dir=base_bath,
                 local_dir_use_symlinks=False,
             )
 
