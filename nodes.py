@@ -280,6 +280,8 @@ class LivePortraitProcess:
             
             "optional": {
                 "opt_retargeting_info": ("RETARGETINGINFO", {"default": None}),
+                "expression_friendly": ("BOOLEAN", {"default": False}),
+                "expression_friendly_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 100.0, "step": 0.001}),
             }
         }
 
@@ -308,9 +310,13 @@ class LivePortraitProcess:
         delta_multiplier: float = 1.0,
         mismatch_method: str = "constant",
         opt_retargeting_info: dict = None,
+        expression_friendly: bool = False,
+        expression_friendly_multiplier: float = 1.0,
     ):
         if driving_images.shape[0] < source_image.shape[0]:
             raise ValueError("The number of driving images should be larger than the number of source images.")
+        if expression_friendly and source_image.shape[0] > 1:
+            raise ValueError("expression_friendly works only with single source image")
         
         if opt_retargeting_info is not None:
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = opt_retargeting_info["eye_retargeting"]
@@ -347,7 +353,9 @@ class LivePortraitProcess:
             delta_multiplier,
             relative_motion_mode,
             driving_smooth_observation_variance,
-            mismatch_method
+            mismatch_method,
+            expression_friendly=expression_friendly,
+            driving_multiplier=expression_friendly_multiplier,
         )
 
         total_frames = len(out["out_list"])
