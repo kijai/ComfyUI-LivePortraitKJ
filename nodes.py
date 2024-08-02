@@ -8,7 +8,6 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 import gc
-
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
@@ -238,7 +237,6 @@ class LivePortraitProcess:
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
-
             "pipeline": ("LIVEPORTRAITPIPE",),
             "crop_info": ("CROPINFO", {"default": {}}),
             "source_image": ("IMAGE",),
@@ -302,13 +300,36 @@ class LivePortraitProcess:
     ):
         if driving_images.shape[0] < source_image.shape[0]:
             raise ValueError("The number of driving images should be larger than the number of source images.")
+
+        # Find first image with face
+        first_valid_index = next((i for i, info in enumerate(crop_info["crop_info_list"]) if info is not None), None)
         
+        # If no valid crop info, return blank images and empty output
+        if first_valid_index is None:
+            log.warning("No valid face detected in any of the source images. Returning blank images.")
+            #what is correct size to return? This is working 
+            blank_images = torch.zeros((total_frames, 512, 512, 3), dtype=torch.float32, device=source_image.device)
+            empty_out = {
+                "out_list": [None] * total_frames,
+                "crop_info": crop_info
+            }
+            return (blank_images, empty_out)
+        
+        # Fast-forward to start from the first valid frame with a face
+        source_image = source_image[first_valid_index:]
+        driving_images = driving_images[first_valid_index:]
+        crop_info["crop_info_list"] = crop_info["crop_info_list"][first_valid_index:]
+        crop_info["source_rot_list"] = crop_info["source_rot_list"][first_valid_index:]
+        crop_info["f_s_list"] = crop_info["f_s_list"][first_valid_index:]
+        crop_info["x_s_list"] = crop_info["x_s_list"][first_valid_index:]
+        crop_info["source_info"] = crop_info["source_info"][first_valid_index:]
+
         if opt_retargeting_info is not None:
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = opt_retargeting_info["eye_retargeting"]
             pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = (opt_retargeting_info["eyes_retargeting_multiplier"])
             pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = opt_retargeting_info["lip_retargeting"]
             pipeline.live_portrait_wrapper.cfg.lip_retargeting_multiplier = (opt_retargeting_info["lip_retargeting_multiplier"])
-            driving_landmarks = opt_retargeting_info["driving_landmarks"]
+            driving_landmarks = opt_retargeting_info["driving_landmarks"][first_valid_index:]
         else:
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = False
             pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = 1.0
@@ -341,21 +362,32 @@ class LivePortraitProcess:
             mismatch_method
         )
 
-        total_frames = len(out["out_list"])
-      
-        if total_frames > 1:
-            cropped_image_list = []
-            for i in (range(total_frames)):
-                if not out["out_list"][i]:
-                    cropped_image_list.append(torch.zeros(1, 512, 512, 3, dtype=torch.float32, device = "cpu"))
-                else:
-                    cropped_image = torch.clamp(out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1).cpu()
-                    cropped_image_list.append(cropped_image)
+        # Get the shape of the first output in the "out_list". What is correct size? This is working
+        try:
+            blank_shape = torch.clamp(out["out_list"][0]["out"], 0, 1).permute(0, 2, 3, 1).cpu().shape
+        except (IndexError, KeyError, AttributeError):
+            # Use a default shape if no faces. Prob shouldn't happen
+            blank_shape = (1, 512, 512, 3)
 
-            cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
-        else:
-            cropped_out_tensors = torch.clamp(out["out_list"][0]["out"], 0, 1).permute(0, 2, 3, 1)
-      
+        total_frames = len(driving_images)
+        
+        cropped_image_list = []
+        for i in range(total_frames):
+            if i < len(out["out_list"]) and out["out_list"][i]:
+                cropped_image = torch.clamp(out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1).cpu()
+                cropped_image_list.append(cropped_image)
+            else:
+                blank_image = torch.zeros(blank_shape, dtype=torch.float32, device=source_image.device)
+                cropped_image_list.append(blank_image)
+
+        # Prepend blank frames for the skipped initial frames
+        if first_valid_index > 0:
+            blank_shape = cropped_image_list[0].shape
+            blank_frames = [torch.zeros(blank_shape, dtype=torch.float32, device=source_image.device) for _ in range(first_valid_index)]
+            cropped_image_list = blank_frames + cropped_image_list
+
+        cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
+
         return (cropped_out_tensors, out,)
     
 class LivePortraitComposite:
@@ -390,6 +422,11 @@ class LivePortraitComposite:
         if mm.is_device_mps(device): 
             device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
 
+        # Check if liveportrait_out["out_list"] is empty return source
+        if not liveportrait_out["out_list"]:
+            log.warning("LivePortrait output is empty. Returning source images.")
+            return (source_image, torch.zeros_like(source_image[:, :, :, 0]))
+
         B, H, W, C = source_image.shape
         source_image = source_image.permute(0, 3, 1, 2) # B,H,W,C -> B,C,H,W
         cropped_image = cropped_image.permute(0, 3, 1, 2)
@@ -409,45 +446,48 @@ class LivePortraitComposite:
         composited_image_list = []
         out_mask_list = []
 
-        total_frames = len(liveportrait_out["out_list"])
+        total_frames = len(source_image)
         log.info(f"Total frames: {total_frames}")
+
+        # Calculate first valid index based on liveportrait_out
+        first_valid_index = total_frames - len(liveportrait_out["out_list"])
 
         pbar = comfy.utils.ProgressBar(total_frames)
         for i in tqdm(range(total_frames), desc='Compositing..', total=total_frames):
-            safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
-
-            if liveportrait_out["mismatch_method"] == "cut":
-                source_frame = source_image[safe_index].unsqueeze(0).to(device)
-            else:
-                source_frame = _get_source_frame(source_image, i, liveportrait_out["mismatch_method"]).unsqueeze(0).to(device)
-
-            if not liveportrait_out["out_list"][i]:
+            source_frame = source_image[i].unsqueeze(0).to(device)
+            
+            if i < first_valid_index:
                 composited_image_list.append(source_frame.cpu())
                 out_mask_list.append(torch.zeros((1, 3, H, W), device="cpu"))
             else:
-                cropped_image = torch.clamp(liveportrait_out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
+                lp_index = i - first_valid_index
+                if lp_index >= len(liveportrait_out["out_list"]) or not liveportrait_out["out_list"][lp_index]:
+                    composited_image_list.append(source_frame.cpu())
+                    out_mask_list.append(torch.zeros((1, 3, H, W), device="cpu"))
+                else:
+                    cropped_image = torch.clamp(liveportrait_out["out_list"][lp_index]["out"], 0, 1).permute(0, 2, 3, 1)
 
-                # Transform and blend             
-                cropped_image_to_original = _transform_img_kornia(
-                    cropped_image,
-                    crop_info["crop_info_list"][safe_index]["M_c2o"],
-                    dsize=(W, H),
-                    device=device
-                    )
-
-                mask_ori = _transform_img_kornia(
-                    crop_mask[min(i,len(crop_mask)-1)].unsqueeze(0),
-                    crop_info["crop_info_list"][safe_index]["M_c2o"],
-                    dsize=(W, H),
-                    device=device
-                    )
-               
-                cropped_image_to_original_blend = torch.clip(
-                        mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
+                    # Transform and blend             
+                    cropped_image_to_original = _transform_img_kornia(
+                        cropped_image,
+                        crop_info["crop_info_list"][lp_index]["M_c2o"],
+                        dsize=(W, H),
+                        device=device
                         )
 
-                composited_image_list.append(cropped_image_to_original_blend.cpu())
-                out_mask_list.append(mask_ori.cpu())
+                    mask_ori = _transform_img_kornia(
+                        crop_mask[0].unsqueeze(0),  # Always use the first mask
+                        crop_info["crop_info_list"][lp_index]["M_c2o"],
+                        dsize=(W, H),
+                        device=device
+                        )
+                   
+                    cropped_image_to_original_blend = torch.clip(
+                            mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
+                            )
+
+                    composited_image_list.append(cropped_image_to_original_blend.cpu())
+                    out_mask_list.append(mask_ori.cpu())
             pbar.update(1)
 
         full_tensors_out = torch.cat(composited_image_list, dim=0)
@@ -638,8 +678,13 @@ class LivePortraitCropper:
         # Initialize a progress bar for the combined operation
         pbar = comfy.utils.ProgressBar(len(source_image_np))
         for i in tqdm(range(len(source_image_np)), desc='Detecting, cropping, and processing..', total=len(source_image_np)):
-            # Cropping operation
-            crop_info, cropped_image_256 = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
+            
+            # Cropping operation - handle occasional unpack error from insightface
+            try:
+                crop_info, cropped_image_256 = cropper.crop_single_image(source_image_np[i], dsize, scale, vy_ratio, vx_ratio, face_index, face_index_order, rotate)
+            except Exception as e:
+                log.error(f"Error during cropping operation for frame {i}: {str(e)}")
+                crop_info, cropped_image_256 = None, None
             
             # Processing source images
             if crop_info:
@@ -708,11 +753,14 @@ class LivePortraitRetargeting:
     CATEGORY = "LivePortrait"
 
     def process(self, driving_crop_info, eye_retargeting, eyes_retargeting_multiplier, lip_retargeting, lip_retargeting_multiplier):
-
+        
         driving_landmarks = []
         for crop in driving_crop_info["crop_info_list"]:
-            driving_landmarks.append(crop['lmk_crop'])
-                          
+            if crop is not None and 'lmk_crop' in crop:
+                driving_landmarks.append(crop['lmk_crop'])
+            else:
+                driving_landmarks.append(None)  # Append None for frames where no face was detected
+        
         retargeting_info = {
             'eye_retargeting': eye_retargeting,
             'eyes_retargeting_multiplier': eyes_retargeting_multiplier,
@@ -722,7 +770,6 @@ class LivePortraitRetargeting:
         }
 
         return (retargeting_info,)
-
 
 class KeypointsToImage:
     @classmethod
@@ -844,6 +891,8 @@ NODE_CLASS_MAPPINGS = {
     "LivePortraitCropper": LivePortraitCropper,
     "LivePortraitRetargeting": LivePortraitRetargeting,
     #"KeypointScaler": KeypointScaler,
+    #"KeypointScaler": KeypointScaler,
+    #"KeypointScaler": KeypointScaler,
     "KeypointsToImage": KeypointsToImage,
     "LivePortraitLoadCropper": LivePortraitLoadCropper,
     "LivePortraitLoadMediaPipeCropper": LivePortraitLoadMediaPipeCropper,
@@ -853,9 +902,9 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "DownloadAndLoadLivePortraitModels": "(Down)Load LivePortraitModels",
     "LivePortraitProcess": "LivePortrait Process",
+    #"KeypointScaler": "KeypointScaler",
     "LivePortraitCropper": "LivePortrait Cropper",
     "LivePortraitRetargeting": "LivePortrait Retargeting",
-    #"KeypointScaler": "KeypointScaler",
     "KeypointsToImage": "LivePortrait KeypointsToImage",
     "LivePortraitLoadCropper": "LivePortrait Load InsightFaceCropper",
     "LivePortraitLoadMediaPipeCropper": "LivePortrait Load MediaPipeCropper",
