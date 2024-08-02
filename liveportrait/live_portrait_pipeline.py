@@ -14,6 +14,7 @@ from .utils.camera import get_rotation_matrix
 from .live_portrait_wrapper import LivePortraitWrapper
 from .utils.retargeting_utils import calc_eye_close_ratio, calc_lip_close_ratio
 from .utils.filter import smooth
+from .utils.helper import calc_motion_multiplier
 
 import os
 script_directory = os.path.dirname(os.path.abspath(__file__))
@@ -38,7 +39,7 @@ class LivePortraitPipeline(object):
         )
 
     def execute(
-        self, driving_images, crop_info, driving_landmarks, delta_multiplier, relative_motion_mode, driving_smooth_observation_variance, mismatch_method="constant", 
+        self, driving_images, crop_info, driving_landmarks, delta_multiplier, relative_motion_mode, driving_smooth_observation_variance, mismatch_method="constant", expression_friendly=False, driving_multiplier=1.0, 
     ):
         inference_cfg = self.live_portrait_wrapper.cfg
         device = inference_cfg.device_id
@@ -73,6 +74,8 @@ class LivePortraitPipeline(object):
                 driving_info.append(None)
                 driving_rot_list.append(None)
                 driving_exp_list.append(None)
+                if i == 0:
+                    raise ValueError("No face detected in FIRST source image")
                 continue
             x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
             
@@ -172,6 +175,15 @@ class LivePortraitPipeline(object):
             delta_new = delta_new * delta_multiplier
             
             x_d_i_new = scale_new * (x_c_s @ R_new + delta_new) + t_new
+
+            if expression_friendly:
+                if i == 0:
+                    x_d_0_new = x_d_i_new
+                    motion_multiplier = calc_motion_multiplier(x_s, x_d_0_new)
+                    motion_multiplier *= driving_multiplier
+                x_d_diff = (x_d_i_new - x_d_0_new) * motion_multiplier
+                x_d_i_new = x_d_diff + x_s
+
             if (
                 not inference_cfg.flag_stitching
                 and not inference_cfg.flag_eye_retargeting

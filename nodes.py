@@ -9,17 +9,25 @@ import cv2
 from tqdm import tqdm
 import gc
 
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log = logging.getLogger(__name__)
+
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 from .liveportrait.live_portrait_pipeline import LivePortraitPipeline
 try:
     from .liveportrait.utils.cropper import CropperMediaPipe
 except:
-    raise ModuleNotFoundError("Can't load MediaPipe, MediaPipeCropper not available")
+    log.warning("Can't load MediaPipe, MediaPipeCropper not available")
 try:
     from .liveportrait.utils.cropper import CropperInsightFace
 except:
-    raise ModuleNotFoundError("Can't load InsightFace, InsightFaceCropper not available")
+    log.warning("Can't load MediaPipe, MediaPipeCropper not available")
+try:
+    from .liveportrait.utils.cropper import CropperFaceAlignment
+except:
+    log.warning("Can't load FaceAlignment, CropperFaceAlignment not available")
 
 from .liveportrait.modules.spade_generator import SPADEDecoder
 from .liveportrait.modules.warping_network import WarpingNetwork
@@ -33,9 +41,6 @@ from .liveportrait.modules.stitching_retargeting_network import (
 from .liveportrait.utils.camera import get_rotation_matrix
 from .liveportrait.utils.crop import _transform_img_kornia
 
-import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-log = logging.getLogger(__name__)
 
 class InferenceConfig:
     def __init__(
@@ -74,6 +79,12 @@ class DownloadAndLoadLivePortraitModels:
                     ],
                     {"default": "auto"},
                 ),
+                "mode": (
+                    [
+                        "human",
+                        "animal",
+                    ],
+                ),
             },
         }
 
@@ -82,7 +93,7 @@ class DownloadAndLoadLivePortraitModels:
     FUNCTION = "loadmodel"
     CATEGORY = "LivePortrait"
 
-    def loadmodel(self, precision="fp16"):
+    def loadmodel(self, precision="fp16", mode="human"):
         device = mm.get_torch_device()
         mm.soft_empty_cache()
 
@@ -105,16 +116,20 @@ class DownloadAndLoadLivePortraitModels:
 
         pbar = comfy.utils.ProgressBar(3)
 
-        download_path = os.path.join(folder_paths.models_dir, "liveportrait")
-        model_path = os.path.join(download_path)
-
+        base_bath = os.path.join(folder_paths.models_dir, "liveportrait")
+        if mode == "human":
+            model_path = base_bath
+        else:
+            model_path = os.path.join(base_bath, "animal")
+      
         if not os.path.exists(model_path):
             log.info(f"Downloading model to: {model_path}")
             from huggingface_hub import snapshot_download
 
             snapshot_download(
                 repo_id="Kijai/LivePortrait_safetensors",
-                local_dir=download_path,
+                ignore_patterns=["*landmark_model.pth*","*animal*"] if mode == "human" else ["*landmark_model.pth*"],
+                local_dir=base_bath,
                 local_dir_use_symlinks=False,
             )
 
@@ -240,7 +255,7 @@ class LivePortraitProcess:
             "lip_zero": ("BOOLEAN", {"default": False}),
             "lip_zero_threshold": ("FLOAT", {"default": 0.03, "min": 0.001, "max": 4.0, "step": 0.001}),
             "stitching": ("BOOLEAN", {"default": True}),
-            "delta_multiplier": ("FLOAT", {"default": 1.0, "min": -10.0, "max": 10.0, "step": 0.001}),
+            "delta_multiplier": ("FLOAT", {"default": 1.0, "min": -100.0, "max": 100.0, "step": 0.001}),
             "mismatch_method": (
                     [
                         "constant",
@@ -265,6 +280,8 @@ class LivePortraitProcess:
             
             "optional": {
                 "opt_retargeting_info": ("RETARGETINGINFO", {"default": None}),
+                "expression_friendly": ("BOOLEAN", {"default": False}),
+                "expression_friendly_multiplier": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 100.0, "step": 0.001}),
             }
         }
 
@@ -293,9 +310,13 @@ class LivePortraitProcess:
         delta_multiplier: float = 1.0,
         mismatch_method: str = "constant",
         opt_retargeting_info: dict = None,
+        expression_friendly: bool = False,
+        expression_friendly_multiplier: float = 1.0,
     ):
         if driving_images.shape[0] < source_image.shape[0]:
             raise ValueError("The number of driving images should be larger than the number of source images.")
+        if expression_friendly and source_image.shape[0] > 1:
+            raise ValueError("expression_friendly works only with single source image")
         
         if opt_retargeting_info is not None:
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = opt_retargeting_info["eye_retargeting"]
@@ -332,7 +353,9 @@ class LivePortraitProcess:
             delta_multiplier,
             relative_motion_mode,
             driving_smooth_observation_variance,
-            mismatch_method
+            mismatch_method,
+            expression_friendly=expression_friendly,
+            driving_multiplier=expression_friendly_multiplier,
         )
 
         total_frames = len(out["out_list"])
@@ -389,7 +412,10 @@ class LivePortraitComposite:
         cropped_image = cropped_image.permute(0, 3, 1, 2)
 
         if mask is not None:
-            crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
+            if len(mask.size())==2:
+                crop_mask = mask.unsqueeze(0).unsqueeze(-1).expand(-1, -1, -1, 3)
+            else:    
+                crop_mask = mask.unsqueeze(-1).expand(-1, -1, -1, 3)
         else:
             log.info("Using default mask template")
             crop_mask = cv2.imread(os.path.join(script_directory, "liveportrait", "utils", "resources", "mask_template.png"), cv2.IMREAD_COLOR)
@@ -427,7 +453,7 @@ class LivePortraitComposite:
                     )
 
                 mask_ori = _transform_img_kornia(
-                    crop_mask,
+                    crop_mask[min(i,len(crop_mask)-1)].unsqueeze(0),
                     crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(W, H),
                     device=device
@@ -477,7 +503,10 @@ class LivePortraitLoadCropper:
                         "default": 'CPU'
                     }),
             "keep_model_loaded": ("BOOLEAN", {"default": True})
-            },           
+            },
+            "optional": {
+                "detection_threshold": ("FLOAT", {"default": 0.5, "min": 0.05, "max": 1.0, "step": 0.01}),
+            },
         }
 
     RETURN_TYPES = ("LPCROPPER",)
@@ -485,10 +514,11 @@ class LivePortraitLoadCropper:
     FUNCTION = "crop"
     CATEGORY = "LivePortrait"
 
-    def crop(self, onnx_device, keep_model_loaded):
+    def crop(self, onnx_device, keep_model_loaded, detection_threshold=0.5):
         cropper_init_config = {
             'keep_model_loaded': keep_model_loaded,
-            'onnx_device': onnx_device
+            'onnx_device': onnx_device,
+            'detection_threshold': detection_threshold
         }
         
         if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
@@ -503,7 +533,7 @@ class LivePortraitLoadMediaPipeCropper:
         return {"required": {
 
             "landmarkrunner_onnx_device": (
-                    ['CPU', 'CUDA', 'ROCM', 'CoreML'], {
+                    ['CPU', 'CUDA', 'ROCM', 'CoreML', 'torch_gpu'], {
                         "default": 'CPU'
                     }),
             "keep_model_loaded": ("BOOLEAN", {"default": True})
@@ -524,6 +554,58 @@ class LivePortraitLoadMediaPipeCropper:
         if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
             self.current_config = cropper_init_config
             self.cropper = CropperMediaPipe(**cropper_init_config)
+
+        return (self.cropper,)
+    
+class LivePortraitLoadFaceAlignmentCropper:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "face_detector": (
+                    ['blazeface', 'blazeface_back_camera', 'sfd'], {
+                        "default": 'blazeface_back_camera'
+                    }),
+
+            "landmarkrunner_device": (
+                    ['CPU', 'CUDA', 'ROCM', 'CoreML', 'torch_gpu'], {
+                        "default": 'torch_gpu'
+                    }),
+            "face_detector_device": (
+                    ['cuda', 'cpu', 'mps'], {
+                        "default": 'cuda'
+                    }),
+
+            "face_detector_dtype": (
+                    [
+                        "fp16",
+                        "bf16",
+                        "fp32",
+                    ],
+                    {"default": "fp16"},
+                ),
+            "keep_model_loaded": ("BOOLEAN", {"default": True})
+
+            },           
+        }
+
+    RETURN_TYPES = ("LPCROPPER",)
+    RETURN_NAMES = ("cropper",)
+    FUNCTION = "crop"
+    CATEGORY = "LivePortrait"
+
+    def crop(self, landmarkrunner_device, keep_model_loaded, face_detector, face_detector_device, face_detector_dtype):
+        dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[face_detector_dtype]
+        cropper_init_config = {
+            'keep_model_loaded': keep_model_loaded,
+            'onnx_device': landmarkrunner_device,
+            'face_detector_device': face_detector_device,
+            'face_detector': face_detector,
+            'face_detector_dtype': dtype
+        }
+        
+        if not hasattr(self, 'cropper') or self.cropper is None or self.current_config != cropper_init_config:
+            self.current_config = cropper_init_config
+            self.cropper = CropperFaceAlignment(**cropper_init_config)
 
         return (self.cropper,)
     
@@ -664,6 +746,7 @@ class KeypointsToImage:
     def INPUT_TYPES(s):
         return {"required": {
             "crop_info": ("CROPINFO", {"default": []}),
+            "draw_lines": ("BOOLEAN", {"default": False}),
             },
         }
 
@@ -672,20 +755,45 @@ class KeypointsToImage:
     FUNCTION = "drawkeypoints"
     CATEGORY = "LivePortrait"
 
-    def drawkeypoints(self, crop_info):
-        height, width = crop_info["crop_info_list"][0]['input_image_size']
+    def drawkeypoints(self, crop_info, draw_lines):
+        #           left upper eye | left lower eye | right upper eye | right lower eye | upper lip top | lower lip bottom | upper lip bottom | lower lip top | jawline         | left eyebrow | right eyebrow | nose            | left pupil    | right pupil  |  nose center
+        indices = [                  12,               24,              37,               48,             66,                85,                96,             108,              145,           165,            185,             197,             198,            199,          203]
+        colorlut = [(0, 0, 255),     (0, 255, 0),     (0, 0, 255),      (0, 255, 0),      (255, 0, 0),    (255, 0, 255),     (255, 255, 0),     (0, 255, 255),  (128, 128, 128), (128, 128, 0), (128, 128, 0),   (0,128,128),    (255, 255,255),   (255, 255,255), (255,255,255)]
+        colors = []
+        c = 0
+        for i in range(203):
+            if i == indices[c]:
+                c+=1
+            colors.append(colorlut[c])
+        try:
+            height, width = crop_info["crop_info_list"][0]['input_image_size']
+        except:
+            height, width = 512, 512
         keypoints_img_list = []
         pbar = comfy.utils.ProgressBar(len(crop_info))
         for crop in crop_info["crop_info_list"]:
             if crop:
                 keypoints = crop['lmk_crop'].copy()
-                # Draw each landmark as a circle
                 blank_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
-                for (x, y) in keypoints:
-                    # Ensure the coordinates are within the dimensions of the blank image
-                    if 0 <= x < width and 0 <= y < height:
-                        cv2.circle(blank_image, (int(x), int(y)), radius=2, color=(0, 0, 255))
-
+                
+                if draw_lines:
+                    start_idx = 0
+                    for end_idx in indices:
+                        color = colors[start_idx]
+                        for i in range(start_idx, end_idx - 1):
+                            pt1 = tuple(map(int, keypoints[i]))
+                            pt2 = tuple(map(int, keypoints[i+1]))
+                            if all(0 <= c < d for c, d in zip(pt1 + pt2, (width, height) * 2)):
+                                cv2.line(blank_image, pt1, pt2, color, thickness=1)
+                        if end_idx == start_idx +1:
+                            x,y = keypoints[start_idx]
+                            cv2.circle(blank_image, (int(x), int(y)), radius=1, thickness=-1, color=colors[start_idx])
+                              
+                        start_idx = end_idx
+                else:
+                    for index, (x, y) in enumerate(keypoints):
+                        cv2.circle(blank_image, (int(x), int(y)), radius=1, thickness=-1, color=colors[index])
+                
                 keypoints_image = cv2.cvtColor(blank_image, cv2.COLOR_BGR2RGB)
             else:
                 keypoints_image = np.zeros((height, width, 3), dtype=np.uint8) * 255
@@ -694,7 +802,6 @@ class KeypointsToImage:
 
         keypoints_img_tensor = (
             torch.stack([torch.from_numpy(np_array) for np_array in keypoints_img_list]) / 255).float()
-
 
         return (keypoints_img_tensor,)
 
@@ -757,6 +864,7 @@ NODE_CLASS_MAPPINGS = {
     "KeypointsToImage": KeypointsToImage,
     "LivePortraitLoadCropper": LivePortraitLoadCropper,
     "LivePortraitLoadMediaPipeCropper": LivePortraitLoadMediaPipeCropper,
+    "LivePortraitLoadFaceAlignmentCropper": LivePortraitLoadFaceAlignmentCropper,
     "LivePortraitComposite": LivePortraitComposite,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -768,5 +876,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KeypointsToImage": "LivePortrait KeypointsToImage",
     "LivePortraitLoadCropper": "LivePortrait Load InsightFaceCropper",
     "LivePortraitLoadMediaPipeCropper": "LivePortrait Load MediaPipeCropper",
+    "LivePortraitLoadFaceAlignmentCropper": "LivePortrait Load FaceAlignmentCropper",
     "LivePortraitComposite": "LivePortrait Composite",
     }
