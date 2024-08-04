@@ -54,7 +54,8 @@ class CropperInsightFace(object):
 
         if len(src_face) == 0:
             ret_dct = {}
-            return ret_dct
+            cropped_image_256 = None
+            return ret_dct, cropped_image_256
 
         src_face = src_face[face_index] # choose the index if multiple faces detected
         pts = src_face.landmark_2d_106
@@ -71,6 +72,7 @@ class CropperInsightFace(object):
         )
         # update a 256x256 version for network input or else
         cropped_image_256 = cv2.resize(image_crop, (256, 256), interpolation=cv2.INTER_AREA)
+        del image_crop
         ret_dct['pt_crop_256x256'] = ret_dct['pt_crop'] * 256 / dsize
 
         input_image_size = img_rgb.shape[:2]
@@ -134,6 +136,7 @@ class CropperMediaPipe(object):
         )
         # update a 256x256 version for network input or else
         cropped_image_256 = cv2.resize(image_crop, (256, 256), interpolation=cv2.INTER_AREA)
+        del image_crop
         ret_dct['pt_crop_256x256'] = ret_dct['pt_crop'] * 256 / dsize
 
         input_image_size = img_rgb.shape[:2]
@@ -199,6 +202,7 @@ class CropperFaceAlignment(object):
         )
         # update a 256x256 version for network input or else
         cropped_image_256 = cv2.resize(image_crop, (256, 256), interpolation=cv2.INTER_AREA)
+        del image_crop
         ret_dct['pt_crop_256x256'] = ret_dct['pt_crop'] * 256 / dsize
 
         input_image_size = img_rgb.shape[:2]
