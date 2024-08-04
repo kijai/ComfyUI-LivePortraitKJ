@@ -43,23 +43,17 @@ def _transform_img_kornia(img, M, dsize, device, flags='bilinear', borderMode='z
 
     # Convert M from numpy.ndarray to PyTorch tensor
     M = torch.from_numpy(M).float().to(device)
+    
     if M.shape == (3, 3):
-        M = M[:2, :].unsqueeze(0)  # Adjust M to the expected shape Bx2x3
-    elif M.shape == (2, 3):
-        M = M.unsqueeze(0)  # Add batch dimension if not present
-
-    # Reshape M for Kornia (1, 2, 3) and upscale to 3D affine matrix if not already
+        M = M[:2, :]
     if M.shape == (2, 3):
-        M = M.unsqueeze(0)  # Add batch dimension
+        M = M.unsqueeze(0)
 
     # Convert image to floating point tensor if not already
     if img.dtype != torch.float32:
         img = img.float()
-    img = img.to(device)
-
-    # Reshape img for Kornia (B, C, H, W)
-    img = img.permute(0, 3, 1, 2)
-
+    img = img.permute(0, 3, 1, 2).to(device) # Reshape img for Kornia (B, C, H, W)
+   
     # Apply the affine transformation
     img_warped = KGT.warp_affine(img, M, _dsize, mode=flags, padding_mode=borderMode)
 

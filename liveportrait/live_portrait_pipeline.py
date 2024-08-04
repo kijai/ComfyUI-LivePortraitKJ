@@ -54,7 +54,6 @@ class LivePortraitPipeline(object):
         else:
             total_frames = driving_images.shape[0]
 
-        
 
         disable_progress_bar = True if relative_motion_mode == "single_frame" else False
 
