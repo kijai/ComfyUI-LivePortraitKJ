@@ -200,7 +200,7 @@ class LivePortraitPipeline(object):
             #with eye/lip retargeting
             else:
                 eyes_delta, lip_delta = None, None
-                if inference_cfg.flag_eye_retargeting:
+                if inference_cfg.flag_eye_retargeting and driving_landmarks[i] is not None:
                     c_d_eyes_i = calc_eye_close_ratio(driving_landmarks[i][None])
                     combined_eye_ratio_tensor = (
                         self.live_portrait_wrapper.calc_combined_eye_ratio(
@@ -215,7 +215,8 @@ class LivePortraitPipeline(object):
                     eyes_delta = self.live_portrait_wrapper.retarget_eye(
                         x_s, combined_eye_ratio_tensor
                     )
-                if inference_cfg.flag_lip_retargeting:
+
+                if inference_cfg.flag_lip_retargeting and driving_landmarks[i] is not None:
                     c_d_lip_i = calc_lip_close_ratio(driving_landmarks[i][None])
                     combined_lip_ratio_tensor = (
                         self.live_portrait_wrapper.calc_combined_lip_ratio(
