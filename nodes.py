@@ -8,6 +8,8 @@ import numpy as np
 import cv2
 from tqdm import tqdm
 import gc
+import time
+from PIL import Image
 
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -740,6 +742,72 @@ class LivePortraitRetargeting:
 
         return (retargeting_info,)
 
+class LivePortraitReferenceFace:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+               "pipeline": ("LIVEPORTRAITPIPE",),
+                "source_crop_info": ("CROPINFO", {"default": {}}),
+                "driving_images": ("IMAGE",),
+               
+                "frame_index": (
+                    "INT",
+                    {
+                        "default": 0,
+                        "min": 0,
+                        "max": 10000,
+                        "step": 1,
+                    },
+                ),
+                
+               
+                
+            },
+            
+        }
+
+    RETURN_TYPES = ("CROPINFO",)
+    RETURN_NAMES = ("crop_info",)
+
+    FUNCTION = "exec"
+    CATEGORY = "LivePortrait"
+    OUTPUT_NODE = True
+    
+    def exec(self, pipeline, source_crop_info, driving_images, frame_index ): 
+        
+        crop_info = source_crop_info["crop_info_list"]  
+        device = pipeline.live_portrait_wrapper.cfg.device_id
+        frame_index = min(frame_index,len(driving_images)-1)
+        
+        driving_image = driving_images[frame_index].clone().unsqueeze(0)
+        
+        if driving_image.shape[1] != 256 or driving_image.shape[2] != 256:
+            driving_image_256 = comfy.utils.common_upscale(driving_image.permute(0, 3, 1, 2), 256, 256, "lanczos", "disabled")
+        else:
+            driving_image_256 = driving_image.permute(0, 3, 1, 2)
+
+        if pipeline.live_portrait_wrapper.cfg.flag_use_half_precision:
+            driving_image_256 = driving_image_256.to(torch.float16)
+        
+        
+        x_d_info = pipeline.live_portrait_wrapper.get_kp_info(driving_image_256.to(device))
+        source_crop_info["reference_face"] = x_d_info
+        
+        preview = Image.fromarray(driving_image_256[0].permute(1,2,0).mul(255.0).clamp(0,255).cpu().numpy().astype(np.uint8))
+        full_output_folder, filename, counter, subfolder, filename_prefix = (
+            folder_paths.get_save_image_path(
+                "", folder_paths.get_temp_directory(), preview.height, preview.width
+            )
+        )
+        tmp_file = "lp_" + str(int(time.time() * 1000)) + ".jpg"
+        preview.save(os.path.join(full_output_folder, tmp_file))
+        ui_preview = [{"filename": tmp_file, "subfolder": subfolder, "type": "temp"}]
+        
+        return {"result": (source_crop_info,), "ui": {"images": ui_preview}}
 
 class KeypointsToImage:
     @classmethod
@@ -860,6 +928,7 @@ NODE_CLASS_MAPPINGS = {
     "LivePortraitProcess": LivePortraitProcess,
     "LivePortraitCropper": LivePortraitCropper,
     "LivePortraitRetargeting": LivePortraitRetargeting,
+    "LivePortraitReferenceFace": LivePortraitReferenceFace,
     #"KeypointScaler": KeypointScaler,
     "KeypointsToImage": KeypointsToImage,
     "LivePortraitLoadCropper": LivePortraitLoadCropper,
@@ -872,6 +941,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "LivePortraitProcess": "LivePortrait Process",
     "LivePortraitCropper": "LivePortrait Cropper",
     "LivePortraitRetargeting": "LivePortrait Retargeting",
+    "LivePortraitReferenceFace": "LivePortrait Reference Face",
     #"KeypointScaler": "KeypointScaler",
     "KeypointsToImage": "LivePortrait KeypointsToImage",
     "LivePortraitLoadCropper": "LivePortrait Load InsightFaceCropper",

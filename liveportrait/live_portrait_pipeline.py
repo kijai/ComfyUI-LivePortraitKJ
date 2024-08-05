@@ -65,6 +65,13 @@ class LivePortraitPipeline(object):
         driving_info = []
         driving_exp_list = []
         driving_rot_list = []
+
+        has_reference = "reference_face" in crop_info
+        if has_reference:
+            ref_x_d_info = crop_info["reference_face"]
+            ref_R_d = get_rotation_matrix(
+                ref_x_d_info["pitch"], ref_x_d_info["yaw"], ref_x_d_info["roll"]
+            )
         
         for i in tqdm(range(driving_images.shape[0]), desc='Processing driving images...', total=driving_images.shape[0], disable=disable_progress_bar):
             #get driving keypoints info
@@ -73,12 +80,14 @@ class LivePortraitPipeline(object):
                 driving_info.append(None)
                 driving_rot_list.append(None)
                 driving_exp_list.append(None)
-                if i == 0:
+                if not has_reference and i == 0:
                     raise ValueError("No face detected in FIRST source image")
                 continue
             x_d_info = self.live_portrait_wrapper.get_kp_info(driving_images[i].unsqueeze(0).to(device))
             
-            if i == 0:
+            if has_reference:
+                first = ref_x_d_info
+            elif i == 0:
                 first = x_d_info
 
             driving_info.append(x_d_info)
@@ -93,7 +102,10 @@ class LivePortraitPipeline(object):
 
         if relative_motion_mode == "source_video_smoothed":
             x_d_r_lst = []
-            first_driving_rot = driving_rot_list[0].cpu().numpy().astype(np.float32).transpose(0, 2, 1)
+            if has_reference:
+                first_driving_rot = ref_R_d.cpu().numpy().astype(np.float32).transpose(0, 2, 1)
+            else:
+                first_driving_rot = driving_rot_list[0].cpu().numpy().astype(np.float32).transpose(0, 2, 1)
             for i in tqdm(range(source_images_num), desc='Smoothing...', total=source_images_num):
                 if driving_rot_list[i] is None:
                     x_d_r_lst.append(None)
@@ -103,8 +115,8 @@ class LivePortraitPipeline(object):
                 dot = np.dot(driving_rot, first_driving_rot) @ source_rot
                 x_d_r_lst.append(dot)
   
-            driving_exp_list_smooth = smooth(driving_exp_list, source_info[0]["exp"].shape, device, observation_variance=driving_smooth_observation_variance)
-            driving_rot_list_smooth = smooth(x_d_r_lst, source_rot_list[0].shape, device, observation_variance=driving_smooth_observation_variance)
+            driving_exp_list_smooth = smooth(driving_exp_list, (1, 21, 3), device, observation_variance=driving_smooth_observation_variance)
+            driving_rot_list_smooth = smooth(x_d_r_lst, (1, 3, 3), device, observation_variance=driving_smooth_observation_variance)
 
         pbar = comfy.utils.ProgressBar(total_frames)
 
@@ -141,7 +153,10 @@ class LivePortraitPipeline(object):
                     lip_delta_before_animation = (self.live_portrait_wrapper.retarget_lip(x_s, combined_lip_ratio_tensor_before_animation))
 
             if relative_motion_mode == "relative":
-                if i == 0:
+                if has_reference:
+                    R_d_0 = ref_R_d 
+                    x_d_0_info = ref_x_d_info
+                elif i == 0:
                     R_d_0 = R_d
                     x_d_0_info = x_d_info
                 R_new = (R_d @ R_d_0.permute(0, 2, 1)) @ R_s
