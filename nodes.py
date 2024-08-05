@@ -298,39 +298,148 @@ class LivePortraitProcess:
         mismatch_method: str = "constant",
         opt_retargeting_info: dict = None,
     ):
+
         if driving_images.shape[0] < source_image.shape[0]:
             raise ValueError("The number of driving images should be larger than the number of source images.")
 
-        # Find first image with face
+        # Find first valid index across all source images
         first_valid_index = next((i for i, info in enumerate(crop_info["crop_info_list"]) if info is not None), None)
         total_frames = len(driving_images)
+
         # If no valid crop info, return blank images and empty output
         if first_valid_index is None:
-            log.warning("No valid face detected in any of the source images. Returning blank images.")
-            #what is correct size to return? This is working 
+            log.warning("LivePortraitProcess: No valid face detected in any of the source images. Returning blank images.")
             blank_images = torch.zeros((total_frames, 512, 512, 3), dtype=torch.float32, device=source_image.device)
             empty_out = {
                 "out_list": [None] * total_frames,
-                "crop_info": crop_info
+                "crop_info": crop_info,
+                "original_length": total_frames,
+                "mismatch_method": mismatch_method,
             }
             return (blank_images, empty_out)
-        
-        orig_len = driving_images.shape[0]
+
         # Fast-forward to start from the first valid frame with a face
         source_image = source_image[first_valid_index:]
         driving_images = driving_images[first_valid_index:]
-        crop_info["crop_info_list"] = crop_info["crop_info_list"][first_valid_index:]
-        crop_info["source_rot_list"] = crop_info["source_rot_list"][first_valid_index:]
-        crop_info["f_s_list"] = crop_info["f_s_list"][first_valid_index:]
-        crop_info["x_s_list"] = crop_info["x_s_list"][first_valid_index:]
-        crop_info["source_info"] = crop_info["source_info"][first_valid_index:]
+        excluded_crop_info = {}
+        for key, value in crop_info.items():
+            if isinstance(value, list):
+                excluded_crop_info[key], crop_info[key] = _slice_data(value, first_valid_index)
+
+        # Find chunks of consecutive frames with valid crop info
+        chunks = self.find_chunks(crop_info["crop_info_list"])
+
+        cropped_image_list = []
+        final_out = {
+            "out_list": [None] * total_frames,  # Initialize with None for all frames
+            "crop_info": crop_info,
+            "original_length": total_frames,
+            "mismatch_method": mismatch_method,
+        }
+
+        for i, chunk in enumerate(chunks):
+            e = chunk[-1]
+            chunk_crop = {key: value[chunk[0]:e+1] for key, value in crop_info.items()}
+            #If there is only one chunk, pass all the driving images
+            if len(source_image) == 1:
+                chunk_driving_images = driving_images
+            #If this is the last chunk of multiple, pass the remaining driving images
+            elif (i == len(chunks) - 1) and len(chunks) > 1:
+                
+                chunk_driving_images = driving_images[chunk[0]:]
+                chunk_crop = {key: value[chunk[0]:] for key, value in crop_info.items()}
+            #Otherwise pass the chunk's driving images
+            else:
+                chunk_driving_images = driving_images[chunk[0]:chunk[-1]+1]
+                
+
+            cropped_images, chunk_out = self.process_chunk(
+                source_image[chunk[0]:chunk[-1]+1],
+                chunk_driving_images,
+                chunk_crop,
+                pipeline,
+                lip_zero,
+                lip_zero_threshold,
+                stitching,
+                relative_motion_mode,
+                driving_smooth_observation_variance,
+                delta_multiplier,
+                mismatch_method,
+                opt_retargeting_info,
+            )
+            cropped_image_list.append(cropped_images)
+
+            # Update final_out with chunk results at correct indices
+            for j, out in enumerate(chunk_out["out_list"]):
+                final_out["out_list"][chunk[0] + j] = out
+
+        #Prepend blank frames for the skipped initial frames
+        if first_valid_index > 0:
+            blank_shape = cropped_image_list[0][0].shape
+            blank_frames = torch.zeros((first_valid_index,) + blank_shape, dtype=torch.float32, device=source_image.device)
+            cropped_image_tensors = torch.cat([blank_frames, torch.cat(cropped_image_list, dim=0)], dim=0)
+            
+            # Update final_out to account for the prepended blank frames
+            for i in range(first_valid_index):
+                final_out["out_list"].insert(0,{})
+                for key, value in final_out['crop_info'].items():
+                    if isinstance(value, list):
+                        value.insert(0, None)
+        else:
+            cropped_image_tensors = torch.cat(cropped_image_list, dim=0)
+
+
+        return (cropped_image_tensors, final_out,)
+
+    def find_chunks(self, crop_info_list):
+        chunks = []
+        current_chunk = []
+        for i, info in enumerate(crop_info_list):
+            if info is not None:
+                if not current_chunk:
+                    current_chunk.append(i)
+                current_chunk.append(i)
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    current_chunk = []
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        # Fill in the empty frames at the end of each chunk
+        for i, chunk in enumerate(chunks):
+            if i < len(chunks) - 1:
+                next_start = chunks[i+1][0]
+                chunks[i] = [*range(chunk[0], next_start)]
+            else:
+                chunks[i] = [*range(chunk[0], len(crop_info_list))]
+
+        return chunks
+
+    def process_chunk(
+        self,
+        source_image: torch.Tensor,
+        driving_images: torch.Tensor,
+        crop_info: dict,
+        pipeline: LivePortraitPipeline,
+        lip_zero: bool,
+        lip_zero_threshold: float,
+        stitching: bool,
+        relative_motion_mode: str,
+        driving_smooth_observation_variance: float,
+        delta_multiplier: float = 1.0,
+        mismatch_method: str = "constant",
+        opt_retargeting_info: dict = None,
+    ):
+
+        total_frames = len(driving_images)
 
         if opt_retargeting_info is not None:
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = opt_retargeting_info["eye_retargeting"]
             pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = (opt_retargeting_info["eyes_retargeting_multiplier"])
             pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = opt_retargeting_info["lip_retargeting"]
             pipeline.live_portrait_wrapper.cfg.lip_retargeting_multiplier = (opt_retargeting_info["lip_retargeting_multiplier"])
-            driving_landmarks = opt_retargeting_info["driving_landmarks"][first_valid_index:]
+            driving_landmarks = opt_retargeting_info["driving_landmarks"]
         else:
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = False
             pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = 1.0
@@ -370,8 +479,6 @@ class LivePortraitProcess:
             # Use a default shape if no faces. Prob shouldn't happen
             blank_shape = (1, 512, 512, 3)
 
-        
-        
         cropped_image_list = []
         for i in range(total_frames):
             if i < len(out["out_list"]) and out["out_list"][i]:
@@ -381,15 +488,12 @@ class LivePortraitProcess:
                 blank_image = torch.zeros(blank_shape, dtype=torch.float32, device=source_image.device)
                 cropped_image_list.append(blank_image)
 
-        # Prepend blank frames for the skipped initial frames
-        if first_valid_index > 0:
-            blank_shape = cropped_image_list[0].shape
-            blank_frames = [torch.zeros(blank_shape, dtype=torch.float32, device=source_image.device) for _ in range(first_valid_index)]
-            cropped_image_list = blank_frames + cropped_image_list
-
         cropped_out_tensors = torch.cat(cropped_image_list, dim=0)
-        out["original_length"] = orig_len
-        return (cropped_out_tensors, out,)
+
+
+
+
+        return (cropped_out_tensors, out)
     
 class LivePortraitComposite:
     @classmethod
@@ -423,12 +527,6 @@ class LivePortraitComposite:
         if mm.is_device_mps(device): 
             device = torch.device('cpu') #this function returns NaNs on MPS, defaulting to CPU
 
-        # Check if 'original_length' doesn't exist in liveportrait_out. If not, process either failed or there were no faces. Return source
-        if 'original_length' not in liveportrait_out:
-            log.warning("LivePortrait processing was not successful. Returning source images.")
-            return (source_image, torch.zeros_like(source_image[:, :, :, 0]))
-
-        total_frames = liveportrait_out['original_length']
         B, H, W, C = source_image.shape
         source_image = source_image.permute(0, 3, 1, 2) # B,H,W,C -> B,C,H,W
         cropped_image = cropped_image.permute(0, 3, 1, 2)
@@ -447,57 +545,47 @@ class LivePortraitComposite:
         crop_info = liveportrait_out["crop_info"]
         composited_image_list = []
         out_mask_list = []
-
-        
+        prepend_num = len(source_image)-len(cropped_image)
+        total_frames = len(liveportrait_out["out_list"])
         log.info(f"Total frames: {total_frames}")
 
-        # Calculate first valid index based on liveportrait_out
-        first_valid_index = max(0, total_frames - len(liveportrait_out["out_list"]))
-
-        total_frames = liveportrait_out['original_length']
-        first_valid_index = max(0, total_frames - len(liveportrait_out["out_list"]))
-        output_index = 0
 
         pbar = comfy.utils.ProgressBar(total_frames)
         for i in tqdm(range(total_frames), desc='Compositing..', total=total_frames):
+            safe_index = min(i, len(crop_info["crop_info_list"]) - 1)
+
             if liveportrait_out["mismatch_method"] == "cut":
-                source_frame = source_image[min(i, source_image.shape[0] - 1)].unsqueeze(0).to(device)
+                source_frame = source_image[safe_index].unsqueeze(0).to(device)
             else:
                 source_frame = _get_source_frame(source_image, i, liveportrait_out["mismatch_method"]).unsqueeze(0).to(device)
 
-            if i < first_valid_index or output_index >= len(liveportrait_out["out_list"]) or not liveportrait_out["out_list"][output_index]:
+            if not liveportrait_out["out_list"][i]:
                 composited_image_list.append(source_frame.cpu())
                 out_mask_list.append(torch.zeros((1, 3, H, W), device="cpu"))
-                log.debug(f"Frame {i}: Using source frame (no processed data available)")
             else:
-                cropped_image = torch.clamp(liveportrait_out["out_list"][output_index]["out"], 0, 1).permute(0, 2, 3, 1)
+                cropped_image = torch.clamp(liveportrait_out["out_list"][i]["out"], 0, 1).permute(0, 2, 3, 1)
 
-                # Use output_index directly for crop info
-                crop_info_index = min(output_index, len(crop_info["crop_info_list"]) - 1)
-                
                 # Transform and blend             
                 cropped_image_to_original = _transform_img_kornia(
                     cropped_image,
-                    crop_info["crop_info_list"][crop_info_index]["M_c2o"],
+                    crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(W, H),
                     device=device
                     )
 
                 mask_ori = _transform_img_kornia(
-                    crop_mask[0].unsqueeze(0),  # Always use the first mask
-                    crop_info["crop_info_list"][crop_info_index]["M_c2o"],
+                    crop_mask[min(i,len(crop_mask)-1)].unsqueeze(0),
+                    crop_info["crop_info_list"][safe_index]["M_c2o"],
                     dsize=(W, H),
                     device=device
                     )
-                
+               
                 cropped_image_to_original_blend = torch.clip(
                         mask_ori * cropped_image_to_original + (1 - mask_ori) * source_frame, 0, 1
                         )
 
                 composited_image_list.append(cropped_image_to_original_blend.cpu())
                 out_mask_list.append(mask_ori.cpu())
-                log.debug(f"Frame {i}: Processed (output_index: {output_index}, crop_info_index: {crop_info_index})")
-                output_index += 1
             pbar.update(1)
 
         full_tensors_out = torch.cat(composited_image_list, dim=0)
@@ -510,6 +598,7 @@ class LivePortraitComposite:
             full_tensors_out.float(), 
             mask_tensors_out.float()
             )
+    
     
 def _get_source_frame(source, idx, method):
         if source.shape[0] == 1:
@@ -525,6 +614,17 @@ def _get_source_frame(source, idx, method):
             if mirror_idx >= source.shape[0]:
                 mirror_idx = cycle_length - mirror_idx
             return source[mirror_idx]
+
+def _slice_data(data, index):
+    if isinstance(data, list):
+        excluded = data[:index]
+        sliced = data[index:]
+        return excluded, sliced
+    elif isinstance(data, dict):
+        excluded = {k: (v[:index] if isinstance(v, list) else v) for k, v in data.items()}
+        sliced = {k: (v[index:] if isinstance(v, list) else v) for k, v in data.items()}
+        return excluded, sliced
+    return None, data
 
 class LivePortraitLoadCropper:
     @classmethod
