@@ -319,6 +319,18 @@ class LivePortraitProcess:
             raise ValueError("expression_friendly works only with single source image")
         
         if opt_retargeting_info is not None:
+            # Check if any landmarks are None
+            has_none = any(lm is None for lm in opt_retargeting_info["driving_landmarks"])
+            if has_none:
+                # Create empty frames for the whole sequence
+                empty_frames = torch.zeros(driving_images.shape[0], 512, 512, 3, dtype=torch.float32, device="cpu")
+                empty_out = {
+                    "out_list": [{} for _ in range(driving_images.shape[0])],
+                    "crop_info": crop_info,
+                    "mismatch_method": mismatch_method
+                }
+                return (empty_frames, empty_out)
+                    
             pipeline.live_portrait_wrapper.cfg.flag_eye_retargeting = opt_retargeting_info["eye_retargeting"]
             pipeline.live_portrait_wrapper.cfg.eyes_retargeting_multiplier = (opt_retargeting_info["eyes_retargeting_multiplier"])
             pipeline.live_portrait_wrapper.cfg.flag_lip_retargeting = opt_retargeting_info["lip_retargeting"]
@@ -728,7 +740,10 @@ class LivePortraitRetargeting:
 
         driving_landmarks = []
         for crop in driving_crop_info["crop_info_list"]:
-            driving_landmarks.append(crop['lmk_crop'])
+            if crop is not None:
+                driving_landmarks.append(crop['lmk_crop'])
+            else:
+                driving_landmarks.append(None)
                           
         retargeting_info = {
             'eye_retargeting': eye_retargeting,
