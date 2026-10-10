@@ -75,8 +75,10 @@ class FaceAlignment:
         #    torch.backends.cudnn.benchmark = True
 
         # Get the face detector
-        package_directory_name = os.path.basename(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        face_detector_module = importlib.import_module('.face_alignment.detection.' + face_detector, package=package_directory_name)
+        # Import relative to this package instead of the custom-node folder name: ComfyUI does not
+        # always register the node under its folder name (newer versions use the full path as the
+        # module name), so importing by folder name fails with ModuleNotFoundError.
+        face_detector_module = importlib.import_module('.detection.' + face_detector, package=__package__)
 
 
         face_detector_kwargs = face_detector_kwargs or {}
